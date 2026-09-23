@@ -1,0 +1,173 @@
+---- Pulling Essentials -----
+VORPcore    = exports.vorp_core:GetCore()
+DoorLocksAPI = exports['bcc-doorlocks']:getDoorLocksAPI()
+
+Discord = BccUtils.Discord.setup(Config.WebhookLink, Config.WebhookTitle, Config.WebhookAvatar)
+
+DbUpdated = false -- Use this to stop taxes from running till db has been made
+BCCHousingResourceStopping = false
+
+function GetHousingCharacter(src)
+    local user = VORPcore.getUser(src)
+    return user and user.getUsedCharacter or nil
+end
+
+function IsHousingAdmin(src)
+    local character = GetHousingCharacter(src)
+    if not character then return false end
+
+    if character.group == Config.adminGroup then
+        return true
+    end
+
+    for _, jobCfg in ipairs(Config.ALlowedJobs or {}) do
+        if character.job == jobCfg.jobname then
+            return true
+        end
+    end
+
+    return false
+end
+
+function IsHouseOwner(src, houseId)
+    local character = GetHousingCharacter(src)
+    local numericHouseId = tonumber(houseId)
+    if not character or not numericHouseId then return false end
+
+    local owner = MySQL.scalar.await('SELECT charidentifier FROM bcchousing WHERE houseid = ?', { numericHouseId })
+    return owner ~= nil and tostring(owner) == tostring(character.charIdentifier)
+end
+
+function IsDoorOwnedByCharacter(src, doorId)
+    local character = GetHousingCharacter(src)
+    local numericDoorId = tonumber(doorId)
+    if not character or not numericDoorId then return false end
+
+    local houses = MySQL.query.await('SELECT charidentifier, doors FROM bcchousing WHERE doors IS NOT NULL AND doors != ?', { 'none' }) or {}
+    for _, house in ipairs(houses) do
+        if tostring(house.charidentifier) == tostring(character.charIdentifier) then
+            local ok, doors = pcall(json.decode, house.doors)
+            if ok and type(doors) == 'table' then
+                for _, houseDoorId in ipairs(doors) do
+                    if tonumber(houseDoorId) == numericDoorId then
+                        return true
+                    end
+                end
+            end
+        end
+    end
+
+    return false
+end
+
+-- Initialize an empty table to hold player data
+local PlayersTable = {}
+
+-- Event to handle player data retrieval
+BccUtils.RPC:Register('bcc-housing:GetPlayers', function(params, cb, src)
+    local data = {}
+    local players = GetPlayers() -- Fetch all current players on the server
+
+    if players and #players > 0 then
+        for _, playerId in ipairs(players) do
+            local User = VORPcore.getUser(playerId)
+            if User then
+                local Character = User.getUsedCharacter -- Calling the method correctly
+                if Character then
+                    -- Check if firstname and lastname are not nil and provide default values if they are
+                    local firstname = Character.firstname or "Unknown"
+                    local lastname = Character.lastname or "Player"
+                    local playerName = firstname .. ' ' .. lastname
+                    table.insert(data, {
+                        serverId = playerId,
+                        PlayerName = playerName,
+                        staticid = Character.charIdentifier,
+                    })
+                end
+            end
+        end
+    else
+        DBG:Info("No players returned from GetPlayers() or list is empty")
+    end
+    if cb then cb(true, data) else return data end
+end)
+
+-- Event to update PlayersTable with player information for availability checks
+BccUtils.RPC:Register("bcc-housing:getPlayersInfo", function(params, cb, src)
+    if not table.contains(PlayersTable, src) then
+        table.insert(PlayersTable, src) -- Prevent duplicate entries
+    end
+    if cb then cb(true) end
+end)
+
+-- Helper function to check for duplicates in PlayersTable
+function table.contains(table, element)
+    for _, value in ipairs(table) do
+        if value == element then
+            return true
+        end
+    end
+    return false
+end
+
+function NotifyClient(src, message, durationOrType, maybeDuration)
+    local defaultDuration = (Config.NotifyOptions and Config.NotifyOptions.autoClose) or 4000
+    local defaultType = (Config.NotifyOptions and Config.NotifyOptions.type) or "info"
+
+    local notifyType = defaultType
+    local duration = defaultDuration
+
+    if type(durationOrType) == "string" then
+        notifyType = durationOrType
+        duration = tonumber(maybeDuration) or defaultDuration
+    elseif type(durationOrType) == "number" then
+        duration = durationOrType
+        if type(maybeDuration) == "string" then
+            notifyType = maybeDuration
+        end
+    elseif durationOrType ~= nil then
+        duration = defaultDuration
+    end
+
+    if maybeDuration == nil and notifyType ~= defaultType and type(durationOrType) == "string" then
+        duration = defaultDuration
+    end
+
+    if Config.Notify == "feather-menu" then
+        BccUtils.RPC:Notify("bcc-housing:NotifyClient", {
+            message = message,
+            type = notifyType,
+            duration = duration
+        }, src)
+    elseif Config.Notify == "vorp-core" then
+        VORPcore.NotifyRightTip(src, message, duration)
+    else
+        DBG:Warning("^1[Notify] Invalid Config.Notify: " .. tostring(Config.Notify))
+    end
+end
+
+BccUtils.RPC:Register('bcc-housing:ServerSideRssStop', function(_, cb, src)
+    if src then
+        DelSpawnedFurn(src)
+    end
+    MySQL.update("UPDATE bcchousing SET player_source_spawnedfurn='none'")
+    if cb then cb(true) end
+end)
+
+AddEventHandler('onResourceStop', function(resourceName)
+    if resourceName ~= GetCurrentResourceName() then return end
+    BCCHousingResourceStopping = true
+    DBG:Info("[ResourceStop] Server stopping, clearing spawned furniture state and notifying clients")
+    for _, playerId in ipairs(GetPlayers()) do
+        DelSpawnedFurn(tonumber(playerId))
+    end
+    TriggerClientEvent("bcc-housing:ClearFurnitureEvent", -1)
+    MySQL.update("UPDATE bcchousing SET player_source_spawnedfurn='none'")
+end)
+
+AddEventHandler('playerDropped', function()
+    local src = source
+    if src then
+        DelSpawnedFurn(src)
+    end
+end)

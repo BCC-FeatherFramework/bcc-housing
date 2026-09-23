@@ -1,0 +1,99 @@
+<2.5.0>
+## Property Areas and Purchase Experience
+- Added PolyZone property boundaries as an alternative to radius-based property areas: https://github.com/mkafrin/PolyZone/
+- Added admin and realtor tools to capture, edit, export, save, and preview property PolyZones.
+- Added property-area previews for players before purchasing or renting a configured house.
+- Added property-area previews and configured-house teleport options to the admin menu.
+
+## Property Ownership and Payments
+- Added metadata-backed property deed items for purchased and rented properties.
+- Added property deed reissuing through configured real-estate agents.
+- Added automatic deed replacement when a property is transferred to another player.
+- Added cash, gold, and Rol Token support for purchases, rentals, and ledger payments.
+- Added per-house rental controls and an option for tenants to end rentals early.
+
+## Taxes and Rent
+- New purchases, rentals, and admin-created houses now save their actual purchase date.
+- Taxes and rent are collected monthly on each property's purchase-date anniversary.
+- Existing properties without a purchase date receive a legacy fallback based on `Config.TaxDay`.
+- Added `last_tax_processed_at` tracking to prevent duplicate monthly charges.
+- Added overdue-property restrictions and an admin workflow to release properties for ledger payment.
+
+## Administration, Security, and Reliability
+- Expanded admin property details, overdue filtering, boundary previews, and inventory access.
+- Added server-side ownership and permission validation for house, door, ledger, furniture, hotel, and admin operations.
+- Added protection against simultaneous purchases of the same configured house.
+- Improved property boundary detection and reduced enter/leave notification flicker.
+- Improved furniture selling and placement validation.
+- Replaced the housing-local debug shim with the `BccUtils.Debug` API.
+
+## Furniture Vendors and Localization
+- Added support for both `npc.active` and legacy `npc.show` furniture-vendor settings.
+- Improved furniture-vendor client performance with adaptive interaction checks.
+- Restored the real-estate agent's two-second hold interaction using `BccUtils.Prompts`.
+- Localized property-document menu labels and status text.
+- Restored and updated the Polish locale for all current housing features.
+- Expanded README documentation for the new features and configuration.
+
+<2.4.0>
+- Fixed issue where blips would not clear on resource restart  
+- Added a command to edit furniture when standing near it  
+- Improved Discord webhook message with more detailed tax collection information  
+
+<2.3.0>
+- Replaced `devPrint` with `DBG.utils` (requires **bcc-utils v1.4.0**)
+- Added `onClientRestartResource` to clear all furniture
+- Added rotate and zoom for vendor furniture menu (you can now preview furniture before buying)
+- Added option to obtain the `furniture_book` at the vendor shop
+- Added furniture count in the furniture book menu to track spawned and purchased furniture
+- Improved furniture despawn behavior
+- Minor improvements
+
+<2.2.0>
+## Furniture Enhancements, Prompt Fixes & Performance Updates
+-  Added house-context system to ensure prompts display correctly for all players.
+-  Removed network IDs from static objects, improving performance and lifting the 80–120 object spawn limitation.
+-  Numerous furniture improvements for smoother placement and interaction.
+-  Introduced a command to open the house menu when standing within the house radius.
+-  Updated prompts to use click-actions (configurable in the next release).
+-  Added an option to acquire the furniture book directly from a vendor.
+-  Implemented inventory stages same as **bcc-ranch** and **bcc-society**.
+-  Added a `hasArgs` helper to `locale.lua` to ensure `string.format` is only called when arguments are provided.
+
+<2.1.0>
+## New Features
+- Houses with unpaid taxes are now **marked as overdue** (no deletion, access locked).
+- Renters have **separate inventories** (no longer share owner's).
+- Added **unique interiors per hotel** (no longer only Valentine).
+- Rentals can now choose **currency type** (money or gold).
+
+## Improvements
+- Moved furniture vendor settings to **furniture config**.
+- Locale now **caches translations**.
+- Added **version check** system.
+
+## Fixes
+- Fixed **blip issues**.
+- Fixed **furniture vendor issues**.
+<2.0.0>
+## Major Changes
+- Fully refactored to use **Bcc-Utils RPC**  
+  - Replaced `VORPcore.Callback` with `BccUtils.RPC`
+  - Replaced all `RegisterNetEvent` / `RegisterServerEvent` with `BccUtils.RPC:Register`
+  - Replaced all `TriggerServerEvent` / `TriggerClientEvent` with:
+    - `BccUtils.RPC:Notify()` for one-way messages
+    - `BccUtils.RPC:Call()` or `BccUtils.RPC:CallAsync()` for requests expecting responses
+
+- Added **Feather-menu notifications** for a cleaner UI
+- Introduced **furniture vendor shops** — players can now purchase furniture from vendors
+- Furniture placement now requires owning the purchased **furniture item**
+- **Furniture system moved** from the house menu to a dedicated **Furniture Book**
+- Added **furniture preview** before purchase
+- Fixed issue where furniture failed to reappear after disconnects or distance streaming
+- Added smarter property checks:
+  - Disabled when `IsPauseMenuActive()`
+  - Disabled when `IsInCinematicMode()`
+  - Disabled when `IsUiappActiveByHash('MAP')`
+  - And several other blocked UI states
+- Added `setInstance` support (no longer depends on VORP's implementation)
+- Many more improvements
