@@ -276,7 +276,7 @@ function insertHouseDoors(doors, charidentifier, houseId, uniqueName)
             DBG:Error("Failed to insert all doors for the house.", #doorIds .. " from " .. #houseConfig.doors)
         end
         local doorIdsJson = json.encode(doorIds)
-        MySQL.Async.execute("UPDATE bcchousing SET doors = ? WHERE houseid = ?", { doorIdsJson, houseId },
+        exports['feather-mysql']:update("UPDATE bcchousing SET doors = ? WHERE houseid = ?", { doorIdsJson, houseId },
             function(affectedRows)
                 if affectedRows > 0 then
                     DBG:Info("Updated house with door IDs:" .. doorIdsJson)

@@ -86,7 +86,7 @@ BccUtils.RPC:Register('bcc-house:AdminManagementDelHouse', function(params, cb, 
     end
 
     local param = { ['houseid'] = houseId }
-    exports.oxmysql:execute("DELETE FROM bcchousing WHERE houseid=@houseid", param, function(result)
+    exports['feather-mysql']:query("DELETE FROM bcchousing WHERE houseid=@houseid", param, function(result)
         local success = type(result) == "table" and result.affectedRows and result.affectedRows > 0
         if success then
             NotifyClient(src, _U('housesDeleted'), 5000, "success")
@@ -113,7 +113,7 @@ BccUtils.RPC:Register('bcc-house:AdminManagementChangeHouseRadius', function(par
     end
 
     local param = { ['houseid'] = houseId, ['house_radius_limit'] = radius }
-    exports.oxmysql:execute("UPDATE bcchousing SET `house_radius_limit`=@house_radius_limit WHERE houseid=@houseid",
+    exports['feather-mysql']:query("UPDATE bcchousing SET `house_radius_limit`=@house_radius_limit WHERE houseid=@houseid",
         param, function(result)
             local success = type(result) == "table" and result.affectedRows and result.affectedRows > 0
             if success then
@@ -141,7 +141,7 @@ BccUtils.RPC:Register('bcc-house:AdminManagementChangeInvLimit', function(params
     end
 
     local param = { ['houseid'] = houseId, ['invlimit'] = tostring(invLimit) }
-    exports.oxmysql:execute("UPDATE bcchousing SET `invlimit`=@invlimit WHERE houseid=@houseid", param, function(result)
+    exports['feather-mysql']:query("UPDATE bcchousing SET `invlimit`=@invlimit WHERE houseid=@houseid", param, function(result)
         local success = type(result) == "table" and result.affectedRows and result.affectedRows > 0
         if success then
             NotifyClient(src, _U('invUpdatedSuccess'), 5000, "success")
@@ -168,7 +168,7 @@ BccUtils.RPC:Register('bcc-house:AdminManagementChangeTaxAmount', function(param
     end
 
     local param = { ['houseid'] = houseId, ['tax_amount'] = tax }
-    exports.oxmysql:execute("UPDATE bcchousing SET `tax_amount`=@tax_amount WHERE houseid=@houseid", param,
+    exports['feather-mysql']:query("UPDATE bcchousing SET `tax_amount`=@tax_amount WHERE houseid=@houseid", param,
         function(result)
         local success = type(result) == "table" and result.affectedRows and result.affectedRows > 0
         if success then
