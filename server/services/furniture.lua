@@ -1,21 +1,12 @@
 local function InsertFurnitureIntoDB(furnTable, houseId)
     DBG:Info("Inserting furniture into DB for house ID: " .. tostring(houseId))
-    local param = { ['houseid'] = houseId }
-    local result = MySQL.query.await("SELECT * FROM bcchousing WHERE houseid=@houseid", param)
+    local result = DB.query("SELECT * FROM bcchousing WHERE houseid=?", houseId)
     if result[1].furniture == 'none' then
-        local param2 = {
-            ['houseid'] = houseId,
-            ['furn'] = json.encode({ furnTable })
-        }
-        MySQL.update("UPDATE bcchousing SET furniture=@furn WHERE houseid=@houseid", param2)
+        DB.exec("UPDATE bcchousing SET furniture=? WHERE houseid=?", json.encode({ furnTable }), houseId)
     else
         local oldFurn = json.decode(result[1].furniture)
         table.insert(oldFurn, furnTable)
-        local param2 = {
-            ['houseid'] = houseId,
-            ['furn'] = json.encode(oldFurn)
-        }
-        MySQL.update("UPDATE bcchousing SET furniture=@furn WHERE houseid=@houseid", param2)
+        DB.exec("UPDATE bcchousing SET furniture=? WHERE houseid=?", json.encode(oldFurn), houseId)
     end
 end
 
@@ -56,18 +47,13 @@ local function markHouseSpawnState(source, houseid, state)
     spawnedFurnitureByPlayer[source] = spawnedFurnitureByPlayer[source] or {}
     if state then
         spawnedFurnitureByPlayer[source][houseid] = true
-        MySQL.update("UPDATE bcchousing SET player_source_spawnedfurn=@src WHERE houseid=@houseid", {
-            ['src'] = tostring(source),
-            ['houseid'] = houseid
-        })
+        DB.exec("UPDATE bcchousing SET player_source_spawnedfurn=? WHERE houseid=?", tostring(source), houseid)
     else
         spawnedFurnitureByPlayer[source][houseid] = nil
         if not next(spawnedFurnitureByPlayer[source]) then
             spawnedFurnitureByPlayer[source] = nil
         end
-        MySQL.update("UPDATE bcchousing SET player_source_spawnedfurn='none' WHERE houseid=@houseid", {
-            ['houseid'] = houseid
-        })
+        DB.exec("UPDATE bcchousing SET player_source_spawnedfurn='none' WHERE houseid=?", houseid)
     end
 end
 
@@ -94,8 +80,7 @@ BccUtils.RPC:Register("bcc-housing:FurniturePlacedCheck", function(params, cb, s
         return cb(false)
     end
 
-    local param = { ['houseid'] = houseid }
-    local result = MySQL.query.await("SELECT furniture FROM bcchousing WHERE houseid=@houseid", param)
+    local result = DB.query("SELECT furniture FROM bcchousing WHERE houseid=?", houseid)
     if not result or not result[1] then
         return cb(false)
     end
@@ -166,7 +151,7 @@ BccUtils.RPC:Register("bcc-housing:GetHouseFurnitureCount", function(params, cb,
         return cb(false, "invalidHouseId")
     end
 
-    local result = MySQL.query.await("SELECT furniture FROM bcchousing WHERE houseid=@houseid", { ['houseid'] = houseId })
+    local result = DB.query("SELECT furniture FROM bcchousing WHERE houseid=?", houseId)
     if not result or not result[1] then
         DBG:Info("GetHouseFurnitureCount found no data for house ID " .. tostring(houseId))
         return cb(true, 0)
@@ -196,7 +181,7 @@ BccUtils.RPC:Register("bcc-housing:GetOwnerFurniture", function(params, cb, src)
         return cb(false)
     end
 
-    local result = MySQL.query.await("SELECT * FROM bcchousing WHERE houseid=@houseid", { ['houseid'] = houseId })
+    local result = DB.query("SELECT * FROM bcchousing WHERE houseid=?", houseId)
 
     if not result or not result[1] then
         NotifyClient(src, _U("noFurn"), 4000, "info")
@@ -246,8 +231,7 @@ BccUtils.RPC:Register("bcc-housing:GetPlacedFurnitureList", function(params, cb,
         return cb(false, "noCharacter")
     end
 
-    local result = MySQL.query.await("SELECT furniture, charidentifier FROM bcchousing WHERE houseid=@houseid",
-        { ['houseid'] = houseId })
+    local result = DB.query("SELECT furniture, charidentifier FROM bcchousing WHERE houseid=?", houseId)
     if not result or not result[1] then
         return cb(false, "houseNotFound")
     end
@@ -287,8 +271,7 @@ BccUtils.RPC:Register("bcc-housing:UpdatePlacedFurniture", function(params, cb, 
         return cb(false, "noCharacter")
     end
 
-    local result = MySQL.query.await("SELECT furniture, charidentifier FROM bcchousing WHERE houseid=@houseid",
-        { ['houseid'] = houseId })
+    local result = DB.query("SELECT furniture, charidentifier FROM bcchousing WHERE houseid=?", houseId)
     if not result or not result[1] then
         return cb(false, "houseNotFound")
     end
@@ -330,11 +313,7 @@ BccUtils.RPC:Register("bcc-housing:UpdatePlacedFurniture", function(params, cb, 
         z = tonumber(rotation.z or rotation[3]) or 0.0
     }
 
-    MySQL.update("UPDATE bcchousing SET furniture=@furn WHERE houseid=@houseid",
-        {
-            ['furn'] = json.encode(furniture),
-            ['houseid'] = houseId
-        })
+    DB.exec("UPDATE bcchousing SET furniture=? WHERE houseid=?", json.encode(furniture), houseId)
 
     cb(true)
 end)
@@ -351,9 +330,9 @@ BccUtils.RPC:Register('bcc-housing:FurnSoldRemoveFromTable', function(params, cb
         return
     end
 
-    local result = MySQL.query.await(
+    local result = DB.query(
         "SELECT furniture, charidentifier, ownershipStatus FROM bcchousing WHERE houseid = ?",
-        { houseId }
+        houseId
     )
     local houseData = result and result[1]
     if not houseData or tostring(houseData.charidentifier) ~= tostring(character.charIdentifier) then
@@ -378,9 +357,9 @@ BccUtils.RPC:Register('bcc-housing:FurnSoldRemoveFromTable', function(params, cb
 
     table.remove(furniture, furnitureIndex)
     local updatedFurniture = #furniture > 0 and json.encode(furniture) or 'none'
-    local affectedRows = MySQL.update.await(
+    local affectedRows = DB.exec(
         "UPDATE bcchousing SET furniture = ? WHERE houseid = ? AND charidentifier = ? AND furniture = ?",
-        { updatedFurniture, houseId, character.charIdentifier, houseData.furniture }
+        updatedFurniture, houseId, character.charIdentifier, houseData.furniture
     )
     if not affectedRows or affectedRows <= 0 then
         NotifyClient(src, _U("furnNotSold"), 4000, "error")
@@ -412,10 +391,7 @@ end
 
 local function loadOwnedFurniture(charIdentifier)
     if not charIdentifier then return {} end
-    local result = MySQL.query.await("SELECT items FROM bcchousing_ownedfurniture WHERE charidentifier=@charidentifier",
-        {
-            ['charidentifier'] = charIdentifier
-        })
+    local result = DB.query("SELECT items FROM bcchousing_ownedfurniture WHERE charidentifier=?", charIdentifier)
 
     if result and result[1] and result[1].items and result[1].items ~= '' then
         local ok, decoded = pcall(json.decode, result[1].items)
@@ -430,15 +406,11 @@ end
 local function saveOwnedFurniture(charIdentifier, items)
     if not charIdentifier then return end
     local encoded = json.encode(items or {})
-    local params = {
-        ['charidentifier'] = charIdentifier,
-        ['items'] = encoded
-    }
-    local updated = MySQL.update.await(
-    "UPDATE bcchousing_ownedfurniture SET items=@items WHERE charidentifier=@charidentifier", params)
+    local updated = DB.exec(
+    "UPDATE bcchousing_ownedfurniture SET items=? WHERE charidentifier=?", encoded, charIdentifier)
     if not updated or updated == 0 then
-        MySQL.insert.await(
-        "INSERT INTO bcchousing_ownedfurniture (charidentifier, items) VALUES (@charidentifier, @items)", params)
+        DB.insert(
+        "INSERT INTO bcchousing_ownedfurniture (charidentifier, items) VALUES (?, ?)", charIdentifier, encoded)
     end
 end
 
@@ -584,9 +556,9 @@ BccUtils.RPC:Register("bcc-housing:PlaceOwnedFurniture", function(params, cb, sr
         return cb(false)
     end
 
-    local houseResult = MySQL.query.await(
+    local houseResult = DB.query(
         "SELECT charidentifier, allowed_ids, taxes_collected FROM bcchousing WHERE houseid = ?",
-        { houseId }
+        houseId
     )
     local houseData = houseResult and houseResult[1]
     if not characterHasHouseAccess(character, houseData) then

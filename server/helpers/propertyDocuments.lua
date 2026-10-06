@@ -68,7 +68,10 @@ function GiveHousePropertyDocument(source, character, houseConfig, houseId, owne
     local metadata = buildHouseDeedMetadata(character, houseConfig, houseId, ownershipStatus)
 
     if not source then
-        MySQL.update('UPDATE bcchousing SET property_deed = ? WHERE houseid = ?', { json.encode(metadata), houseId })
+        local encoded = json.encode(metadata)
+        CreateThread(function()
+            DB.exec('UPDATE bcchousing SET property_deed = ? WHERE houseid = ?', encoded, houseId)
+        end)
         if cbFn then cbFn(true, metadata) end
         return
     end
@@ -87,7 +90,10 @@ function GiveHousePropertyDocument(source, character, houseConfig, houseId, owne
             return
         end
 
-        MySQL.update('UPDATE bcchousing SET property_deed = ? WHERE houseid = ?', { json.encode(metadata), houseId })
+        local encoded = json.encode(metadata)
+        CreateThread(function()
+            DB.exec('UPDATE bcchousing SET property_deed = ? WHERE houseid = ?', encoded, houseId)
+        end)
         if cbFn then cbFn(true, metadata) end
     end)
 end
@@ -115,12 +121,12 @@ BccUtils.RPC:Register("bcc-housing:GetOwnedPropertyDocuments", function(_, cb, s
         return
     end
 
-    local rows = MySQL.query.await([[
+    local rows = DB.query([[
         SELECT houseid, uniqueName, ownershipStatus, property_deed
         FROM bcchousing
         WHERE charidentifier = ?
         ORDER BY houseid DESC
-    ]], { character.charIdentifier }) or {}
+    ]], character.charIdentifier) or {}
 
     local items = {}
     for _, row in ipairs(rows) do
@@ -150,12 +156,12 @@ BccUtils.RPC:Register("bcc-housing:IssuePropertyDocument", function(params, cb, 
         return
     end
 
-    local rows = MySQL.query.await([[
+    local rows = DB.query([[
         SELECT houseid, charidentifier, uniqueName, ownershipStatus
         FROM bcchousing
         WHERE houseid = ? AND charidentifier = ?
         LIMIT 1
-    ]], { houseId, character.charIdentifier }) or {}
+    ]], houseId, character.charIdentifier) or {}
 
     local house = rows[1]
     if not house then

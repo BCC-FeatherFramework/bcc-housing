@@ -34,7 +34,7 @@ function IsHouseOwner(src, houseId)
     local numericHouseId = tonumber(houseId)
     if not character or not numericHouseId then return false end
 
-    local owner = MySQL.scalar.await('SELECT charidentifier FROM bcchousing WHERE houseid = ?', { numericHouseId })
+    local owner = DB.value('SELECT charidentifier FROM bcchousing WHERE houseid = ?', numericHouseId)
     return owner ~= nil and tostring(owner) == tostring(character.charIdentifier)
 end
 
@@ -43,7 +43,7 @@ function IsDoorOwnedByCharacter(src, doorId)
     local numericDoorId = tonumber(doorId)
     if not character or not numericDoorId then return false end
 
-    local houses = MySQL.query.await('SELECT charidentifier, doors FROM bcchousing WHERE doors IS NOT NULL AND doors != ?', { 'none' }) or {}
+    local houses = DB.query('SELECT charidentifier, doors FROM bcchousing WHERE doors IS NOT NULL AND doors != ?', 'none') or {}
     for _, house in ipairs(houses) do
         if tostring(house.charidentifier) == tostring(character.charIdentifier) then
             local ok, doors = pcall(json.decode, house.doors)
@@ -150,7 +150,7 @@ BccUtils.RPC:Register('bcc-housing:ServerSideRssStop', function(_, cb, src)
     if src then
         DelSpawnedFurn(src)
     end
-    MySQL.update("UPDATE bcchousing SET player_source_spawnedfurn='none'")
+    DB.exec("UPDATE bcchousing SET player_source_spawnedfurn='none'")
     if cb then cb(true) end
 end)
 
@@ -162,7 +162,7 @@ AddEventHandler('onResourceStop', function(resourceName)
         DelSpawnedFurn(tonumber(playerId))
     end
     TriggerClientEvent("bcc-housing:ClearFurnitureEvent", -1)
-    MySQL.update("UPDATE bcchousing SET player_source_spawnedfurn='none'")
+    DB.exec("UPDATE bcchousing SET player_source_spawnedfurn='none'")
 end)
 
 AddEventHandler('playerDropped', function()

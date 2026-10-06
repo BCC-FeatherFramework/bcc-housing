@@ -66,7 +66,7 @@ local function handleHousePurchase(src, houseCoords, moneyTypeParam, cb)
 
     local houseCoordsJson = json.encode(houseCoords)
 
-    local ownedHouses = MySQL.query.await('SELECT * FROM bcchousing WHERE charidentifier=@charidentifier', { ['@charidentifier'] = character.charIdentifier })
+    local ownedHouses = DB.query('SELECT * FROM bcchousing WHERE charidentifier=?', character.charIdentifier)
     if #ownedHouses >= Config.Setup.MaxHousePerChar then
         NotifyClient(src, _U('youOwnMaximum'), 4000, 'error')
         if cbFn then cbFn(false) end
@@ -136,34 +136,25 @@ local function handleHousePurchase(src, houseCoords, moneyTypeParam, cb)
     pendingHousePurchases[selectedHouse.uniqueName] = true
 
     local ownershipStatus = isRental and 'rented' or 'purchased'
-    local parameters = {
-        ['@charidentifier'] = character.charIdentifier,
-        ['@house_coords'] = houseCoordsJson,
-        ['@house_radius_limit'] = tonumber(selectedHouse.houseRadiusLimit) or 0,
-        ['@doors'] = '[]',
-        ['@invlimit'] = selectedHouse.invLimit,
-        ['@tax_amount'] = ownershipStatus == 'purchased' and selectedHouse.taxAmount or selectedHouse.rentCharge,
-        ['@tpInt'] = selectedHouse.tpInt,
-        ['@tpInstance'] = selectedHouse.tpInstance,
-        ['@uniqueName'] = selectedHouse.uniqueName,
-        ['@ownershipStatus'] = ownershipStatus,
-        ['@purchaseCurrencyType'] = currencyType,
-        ['@poly_points'] = encodePolyPoints(selectedHouse.polyPoints),
-        ['@poly_min_z'] = tonumber(selectedHouse.polyMinZ),
-        ['@poly_max_z'] = tonumber(selectedHouse.polyMaxZ),
-    }
+    local houseRadiusLimit = tonumber(selectedHouse.houseRadiusLimit) or 0
+    local taxAmount = ownershipStatus == 'purchased' and selectedHouse.taxAmount or selectedHouse.rentCharge
+    local polyPoints = encodePolyPoints(selectedHouse.polyPoints)
+    local polyMinZ = tonumber(selectedHouse.polyMinZ)
+    local polyMaxZ = tonumber(selectedHouse.polyMaxZ)
 
-    local insertOk, houseId = pcall(MySQL.insert.await, [[
+    local insertOk, houseId = pcall(DB.insert, [[
         INSERT INTO `bcchousing`
             (`charidentifier`, `house_coords`, `house_radius_limit`, `doors`, `invlimit`, `tax_amount`,
              `tpInt`, `tpInstance`, `uniqueName`, `ownershipStatus`, `purchaseCurrencyType`,
              `poly_points`, `poly_min_z`, `poly_max_z`, `purchased_at`)
         SELECT
-            @charidentifier, @house_coords, @house_radius_limit, @doors, @invlimit, @tax_amount,
-            @tpInt, @tpInstance, @uniqueName, @ownershipStatus, @purchaseCurrencyType,
-            @poly_points, @poly_min_z, @poly_max_z, NOW()
-        WHERE NOT EXISTS (SELECT 1 FROM `bcchousing` WHERE `uniqueName` = @uniqueName)
-    ]], parameters)
+            ?, ?, ?, ?, ?, ?,
+            ?, ?, ?, ?, ?,
+            ?, ?, ?, NOW()
+        WHERE NOT EXISTS (SELECT 1 FROM `bcchousing` WHERE `uniqueName` = ?)
+    ]], character.charIdentifier, houseCoordsJson, houseRadiusLimit, '[]', selectedHouse.invLimit, taxAmount,
+        selectedHouse.tpInt, selectedHouse.tpInstance, selectedHouse.uniqueName, ownershipStatus, currencyType,
+        polyPoints, polyMinZ, polyMaxZ, selectedHouse.uniqueName)
     pendingHousePurchases[selectedHouse.uniqueName] = nil
 
     if not insertOk or not houseId or tonumber(houseId) == 0 then
@@ -230,16 +221,16 @@ function insertHouseDoors(doors, charidentifier, houseId, uniqueName)
             local keyItem = 'none'   -- Default key item
             local idsAllowed = '[' .. charidentifier .. ']'
 
-            local doorData = MySQL.query.await('SELECT * FROM `doorlocks` WHERE `doorinfo` = ?', { doorinfo })
+            local doorData = DB.query('SELECT * FROM `doorlocks` WHERE `doorinfo` = ?', doorinfo)
             if not doorData then
                 DBG:Info("Database query failed while checking if the door exists.")
                 return
             end
             if #doorData == 0 then
                 -- Insert the door if it doesn't exist
-                local doorId = MySQL.insert.await(
+                local doorId = DB.insert(
                     "INSERT INTO doorlocks (doorinfo, jobsallowedtoopen, keyitem, locked, ids_allowed) VALUES (?, ?, ?, ?, ?)",
-                    { doorinfo, jobsAllowed, keyItem, locked, idsAllowed }
+                    doorinfo, jobsAllowed, keyItem, locked, idsAllowed
                 )
                 DBG:Info("Door inserted into DB with jobs: " .. jobsAllowed .. ", key: " .. keyItem .. ", ids: " .. idsAllowed)
 
@@ -251,9 +242,9 @@ function insertHouseDoors(doors, charidentifier, houseId, uniqueName)
 
             else
                 DBG:Info("Door already exists in DB")
-                local affectedRows = MySQL.update.await(
+                local affectedRows = DB.exec(
                     "UPDATE doorlocks SET jobsallowedtoopen = ?, keyitem = ?, locked = ?, ids_allowed = ? WHERE doorinfo = ?",
-                    { jobsAllowed, keyItem, locked, idsAllowed, doorinfo }
+                    jobsAllowed, keyItem, locked, idsAllowed, doorinfo
                 )
                 assert(affectedRows > 0, "Failed to update doorlocks table with new values.")
                 DBG:Info("Door updated in DB with jobs: " .. jobsAllowed .. ", key: " .. keyItem .. ", ids: " .. idsAllowed)
@@ -276,15 +267,12 @@ function insertHouseDoors(doors, charidentifier, houseId, uniqueName)
             DBG:Error("Failed to insert all doors for the house.", #doorIds .. " from " .. #houseConfig.doors)
         end
         local doorIdsJson = json.encode(doorIds)
-        exports['feather-mysql']:update("UPDATE bcchousing SET doors = ? WHERE houseid = ?", { doorIdsJson, houseId },
-            function(affectedRows)
-                if affectedRows > 0 then
-                    DBG:Info("Updated house with door IDs:" .. doorIdsJson)
-                else
-                    DBG:Error("Failed to update house with door IDs.")
-                end
-            end
-        )
+        local affectedDoorRows = DB.exec("UPDATE bcchousing SET doors = ? WHERE houseid = ?", doorIdsJson, houseId)
+        if affectedDoorRows > 0 then
+            DBG:Info("Updated house with door IDs:" .. doorIdsJson)
+        else
+            DBG:Error("Failed to update house with door IDs.")
+        end
     else
         DBG:Info("No doors found for the house.")
     end
@@ -292,7 +280,7 @@ end
 
 BccUtils.RPC:Register('bcc-housing:getPurchasedHouses', function(_, cb, src)
     local purchasedHouses = {}
-    local results = MySQL.query.await('SELECT uniqueName FROM bcchousing', {})
+    local results = DB.query('SELECT uniqueName FROM bcchousing')
     if results then
         for _, row in ipairs(results) do
             for _, cfg in pairs(Houses) do

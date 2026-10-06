@@ -34,7 +34,7 @@ local function handleSellHouse(src, houseIdParam, cb)
     local charIdentifier = character.charIdentifier
     DBG:Info(('Sell house request for houseId %s by charIdentifier %s'):format(tostring(houseId), tostring(charIdentifier)))
 
-    MySQL.query('SELECT * FROM bcchousing WHERE houseid = ?', { houseId }, function(result)
+    local result = DB.query('SELECT * FROM bcchousing WHERE houseid = ?', houseId)
         if not result or #result == 0 then
             DBG:Info('handleSellHouse: house not found for id ' .. tostring(houseId))
             if cbFn then cbFn(false, { error = 'house_not_found' }) end
@@ -79,23 +79,18 @@ local function handleSellHouse(src, houseIdParam, cb)
         end
 
         local sellPrice = tonumber(houseConfig.sellPrice) or 0
-        MySQL.update('DELETE FROM bcchousing WHERE houseid = ?', { houseData.houseid })
+        DB.exec('DELETE FROM bcchousing WHERE houseid = ?', houseData.houseid)
 
         if houseData.doors and houseData.doors ~= 'none' then
             local decodeOk, doorIdsJson = pcall(json.decode, houseData.doors)
             if decodeOk and type(doorIdsJson) == 'table' then
                 for _, doorId in ipairs(doorIdsJson) do
-                    MySQL.update('DELETE FROM doorlocks WHERE doorid = ?', { doorId })
+                    DB.exec('DELETE FROM doorlocks WHERE doorid = ?', doorId)
                 end
             end
         end
 
-        local params = {
-            ['@houseid'] = houseData.houseid,
-            ['@identifier'] = charIdentifier,
-            ['@amount'] = sellPrice
-        }
-        MySQL.insert('INSERT INTO bcchousing_transactions (houseid, identifier, amount) VALUES (@houseid, @identifier, @amount)', params)
+        DB.exec('INSERT INTO bcchousing_transactions (houseid, identifier, amount) VALUES (?, ?, ?)', houseData.houseid, charIdentifier, sellPrice)
 
         NotifyClient(src, _U('houseSoldSuccess', sellPrice), 4000, 'success')
         Discord:sendMessage('House sold by charIdentifier: ' .. tostring(charIdentifier) .. '\nHouse ID: ' .. tostring(houseId) .. ' was sold for $' .. tostring(sellPrice))
@@ -114,7 +109,6 @@ local function handleSellHouse(src, houseIdParam, cb)
         BccUtils.RPC:Notify('bcc-housing:ReinitializeChecksAfterSale', {}, src)
 
         if cbFn then cbFn(true, { amount = sellPrice }) end
-    end)
 end
 
 BccUtils.RPC:Register('bcc-housing:sellHouse', function(params, cb, src)
@@ -138,7 +132,7 @@ local function handleUnrentHouse(src, houseIdParam, cb)
 
     local charIdentifier = character.charIdentifier
 
-    MySQL.query('SELECT * FROM bcchousing WHERE houseid = ?', { houseId }, function(result)
+    local result = DB.query('SELECT * FROM bcchousing WHERE houseid = ?', houseId)
         if not result or #result == 0 then
             if cbFn then cbFn(false, { error = 'house_not_found' }) end
             return
@@ -156,13 +150,13 @@ local function handleUnrentHouse(src, houseIdParam, cb)
             return
         end
 
-        MySQL.update('DELETE FROM bcchousing WHERE houseid = ?', { houseData.houseid })
+        DB.exec('DELETE FROM bcchousing WHERE houseid = ?', houseData.houseid)
 
         if houseData.doors and houseData.doors ~= 'none' then
             local decodeOk, doorIdsJson = pcall(json.decode, houseData.doors)
             if decodeOk and type(doorIdsJson) == 'table' then
                 for _, doorId in ipairs(doorIdsJson) do
-                    MySQL.update('DELETE FROM doorlocks WHERE doorid = ?', { doorId })
+                    DB.exec('DELETE FROM doorlocks WHERE doorid = ?', doorId)
                 end
             end
         end
@@ -176,7 +170,6 @@ local function handleUnrentHouse(src, houseIdParam, cb)
         BccUtils.RPC:Notify('bcc-housing:ClientRecHouseLoad', {}, src)
 
         if cbFn then cbFn(true, { houseId = houseId }) end
-    end)
 end
 
 BccUtils.RPC:Register('bcc-housing:unrentHouse', function(params, cb, src)
@@ -227,7 +220,7 @@ local function handleSellHouseToPlayerWithInventory(src, houseIdParam, targetPla
     local charIdentifier = character.charIdentifier
     local targetCharIdentifier = targetCharacter.charIdentifier
 
-    MySQL.query('SELECT * FROM bcchousing WHERE houseid = ? AND charidentifier = ?', { houseId, charIdentifier }, function(result)
+    local result = DB.query('SELECT * FROM bcchousing WHERE houseid = ? AND charidentifier = ?', houseId, charIdentifier)
         if not result or #result == 0 then
             NotifyClient(src, _U('houseNotOwnedOrExist'), 4000, 'error')
             if cbFn then cbFn(false) end
@@ -242,7 +235,7 @@ local function handleSellHouseToPlayerWithInventory(src, houseIdParam, targetPla
             return
         end
 
-        local ownedByTarget = MySQL.query.await('SELECT * FROM bcchousing WHERE charidentifier = ?', { targetCharIdentifier })
+        local ownedByTarget = DB.query('SELECT * FROM bcchousing WHERE charidentifier = ?', targetCharIdentifier)
         if #ownedByTarget >= Config.Setup.MaxHousePerChar then
             NotifyClient(src, _U('buyerMaxHouses'), 4000, 'error')
             NotifyClient(targetPlayerId, _U('maxHouses'), 4000, 'error')
@@ -259,9 +252,9 @@ local function handleSellHouseToPlayerWithInventory(src, houseIdParam, targetPla
 
         targetCharacter.removeCurrency(0, salePrice)
 
-        local affectedRows = MySQL.update.await(
+        local affectedRows = DB.exec(
             'UPDATE bcchousing SET charidentifier = ?, purchaseCurrencyType = ? WHERE houseid = ?',
-            { targetCharIdentifier, 0, houseId }
+            targetCharIdentifier, 0, houseId
         )
 
         if affectedRows == 0 then
@@ -273,12 +266,7 @@ local function handleSellHouseToPlayerWithInventory(src, houseIdParam, targetPla
         RemoveHousePropertyDocument(src, houseId)
         GiveHousePropertyDocument(targetPlayerId, targetCharacter, houseConfig, houseId, houseData.ownershipStatus)
 
-        local params = {
-            ['@houseid'] = houseId,
-            ['@identifier'] = charIdentifier,
-            ['@amount'] = salePrice
-        }
-        MySQL.insert('INSERT INTO bcchousing_transactions (houseid, identifier, amount) VALUES (@houseid, @identifier, @amount)', params)
+        DB.exec('INSERT INTO bcchousing_transactions (houseid, identifier, amount) VALUES (?, ?, ?)', houseId, charIdentifier, salePrice)
 
         NotifyClient(src, _U('houseSoldSuccess', salePrice), 4000, 'success')
         NotifyClient(targetPlayerId, _U('housePurchasedSuccess', salePrice), 4000, 'success')
@@ -293,7 +281,6 @@ local function handleSellHouseToPlayerWithInventory(src, houseIdParam, targetPla
             ' to charIdentifier: ' .. tostring(targetCharIdentifier) .. ' for $' .. tostring(salePrice))
 
         if cbFn then cbFn(true, { amount = salePrice }) end
-    end)
 end
 
 BccUtils.RPC:Register('bcc-housing:sellHouseToPlayerWithInventory', function(params, cb, src)
@@ -350,7 +337,7 @@ local function handleSellHouseToPlayerWithoutInventory(src, houseIdParam, target
     local charIdentifier = character.charIdentifier
     local targetCharIdentifier = targetCharacter.charIdentifier
 
-    MySQL.query('SELECT * FROM bcchousing WHERE houseid = ? AND charidentifier = ?', { houseId, charIdentifier }, function(result)
+    local result = DB.query('SELECT * FROM bcchousing WHERE houseid = ? AND charidentifier = ?', houseId, charIdentifier)
         if not result or #result == 0 then
             NotifyClient(src, _U('noHouseOrNotOwner'), 4000, 'error')
             if cbFn then cbFn(false) end
@@ -365,7 +352,7 @@ local function handleSellHouseToPlayerWithoutInventory(src, houseIdParam, target
             return
         end
 
-        local ownedByTarget = MySQL.query.await('SELECT * FROM bcchousing WHERE charidentifier = ?', { targetCharIdentifier })
+        local ownedByTarget = DB.query('SELECT * FROM bcchousing WHERE charidentifier = ?', targetCharIdentifier)
         if #ownedByTarget >= Config.Setup.MaxHousePerChar then
             NotifyClient(src, _U('buyerMaxHouses'), 4000, 'error')
             NotifyClient(targetPlayerId, _U('maxHouses'), 4000, 'error')
@@ -382,9 +369,9 @@ local function handleSellHouseToPlayerWithoutInventory(src, houseIdParam, target
 
         targetCharacter.removeCurrency(0, salePrice)
 
-        local affectedRows = MySQL.update.await(
+        local affectedRows = DB.exec(
             'UPDATE bcchousing SET charidentifier = ?, furniture = "none", doors = "none", purchaseCurrencyType = ? WHERE houseid = ?',
-            { targetCharIdentifier, 0, houseId }
+            targetCharIdentifier, 0, houseId
         )
 
         if affectedRows == 0 then
@@ -396,12 +383,7 @@ local function handleSellHouseToPlayerWithoutInventory(src, houseIdParam, target
         RemoveHousePropertyDocument(src, houseId)
         GiveHousePropertyDocument(targetPlayerId, targetCharacter, houseConfig, houseId, houseData.ownershipStatus)
 
-        local params = {
-            ['@houseid'] = houseId,
-            ['@identifier'] = charIdentifier,
-            ['@amount'] = salePrice
-        }
-        MySQL.insert('INSERT INTO bcchousing_transactions (houseid, identifier, amount) VALUES (@houseid, @identifier, @amount)', params)
+        DB.exec('INSERT INTO bcchousing_transactions (houseid, identifier, amount) VALUES (?, ?, ?)', houseId, charIdentifier, salePrice)
 
         NotifyClient(src, _U('houseSoldWithoutInventory', salePrice), 4000, 'success')
         NotifyClient(targetPlayerId, _U('housePurchasedWithoutInventory', salePrice), 4000, 'success')
@@ -416,7 +398,6 @@ local function handleSellHouseToPlayerWithoutInventory(src, houseIdParam, target
             ' to charIdentifier: ' .. tostring(targetCharIdentifier) .. ' for $' .. tostring(salePrice))
 
         if cbFn then cbFn(true, { amount = salePrice }) end
-    end)
 end
 
 BccUtils.RPC:Register('bcc-housing:sellHouseToPlayerWithoutInventory', function(params, cb, src)
@@ -437,7 +418,7 @@ BccUtils.RPC:Register('bcc-housing:RequestSoldHouses', function(params, cb, src)
     local charId = character.charIdentifier
     local soldHouses = {}
 
-    local result = MySQL.query.await('SELECT * FROM `bcchousing_transactions` WHERE `identifier` = ?', { charId })
+    local result = DB.query('SELECT * FROM `bcchousing_transactions` WHERE `identifier` = ?', charId)
     if result and #result > 0 then
         for _, house in ipairs(result) do
             soldHouses[#soldHouses + 1] = {
@@ -466,7 +447,7 @@ local function handleCollectHouseSaleMoney(src, cb)
     end
 
     local charIdentifier = character.charIdentifier
-    local transactions = MySQL.query.await('SELECT * FROM bcchousing_transactions WHERE identifier = ?', { charIdentifier })
+    local transactions = DB.query('SELECT * FROM bcchousing_transactions WHERE identifier = ?', charIdentifier)
 
     if transactions and #transactions > 0 then
         local totalAmount = 0
@@ -478,7 +459,7 @@ local function handleCollectHouseSaleMoney(src, cb)
             character.addCurrency(0, totalAmount)
         end
 
-        MySQL.update('DELETE FROM bcchousing_transactions WHERE identifier = ?', { charIdentifier })
+        DB.exec('DELETE FROM bcchousing_transactions WHERE identifier = ?', charIdentifier)
 
         NotifyClient(src, _U('collectedHouseSalesMoney', totalAmount), 4000, 'success')
         Discord:sendMessage('House sale money collected by charIdentifier: ' ..

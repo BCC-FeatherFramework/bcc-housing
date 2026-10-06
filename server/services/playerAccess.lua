@@ -12,7 +12,7 @@ BccUtils.RPC:Register("bcc-housing:GetPlayersWithAccess", function(params, cb, r
     DBG:Info("Fetching players with access for House ID: " .. tostring(houseId))
 
     -- Query to fetch allowed character IDs for the house
-    local result = MySQL.query.await("SELECT allowed_ids FROM bcchousing WHERE houseid = ?", { houseId })
+    local result = DB.query("SELECT allowed_ids FROM bcchousing WHERE houseid = ?", houseId)
 
     if result and #result > 0 then
         local allowedIds = json.decode(result[1].allowed_ids)
@@ -22,7 +22,7 @@ BccUtils.RPC:Register("bcc-housing:GetPlayersWithAccess", function(params, cb, r
             local query = "SELECT * FROM characters WHERE charidentifier IN (" .. placeholders .. ")"
 
             -- Fetch detailed character information
-            local characterDetails = MySQL.query.await(query, allowedIds)
+            local characterDetails = DB.query(query, table.unpack(allowedIds))
             if characterDetails and #characterDetails > 0 then
                 for _, character in ipairs(characterDetails) do
                     DBG:Info("Character found: ID=" ..
@@ -65,7 +65,7 @@ BccUtils.RPC:Register('bcc-housing:NewPlayerGivenAccess', function(params, cb, s
     )
     local _source = src
 
-    local result = MySQL.query.await("SELECT * FROM bcchousing WHERE houseid = ?", { houseid })
+    local result = DB.query("SELECT * FROM bcchousing WHERE houseid = ?", houseid)
 
     if not result or #result == 0 then
         DBG:Error("Error: No results found for houseid: " .. tostring(houseid))
@@ -124,7 +124,7 @@ BccUtils.RPC:Register('bcc-housing:NewPlayerGivenAccess', function(params, cb, s
     if not exists then
         table.insert(idsTable, id)
         local encodedIds = json.encode(idsTable)
-        local affectedRows = MySQL.update.await("UPDATE bcchousing SET allowed_ids = ? WHERE houseid = ?", { encodedIds, houseid })
+        local affectedRows = DB.exec("UPDATE bcchousing SET allowed_ids = ? WHERE houseid = ?", encodedIds, houseid)
         if affectedRows > 0 then
             DBG:Info("Access list updated successfully for houseid: " .. tostring(houseid))
             if recSource and GetPlayerName(recSource) then
@@ -174,7 +174,7 @@ BccUtils.RPC:Register('bcc-housing:RemovePlayerAccess', function(params, cb, src
     DBG:Info("Starting removal of player access. House ID: " ..
         tostring(houseId) .. ", Player ID: " .. tostring(playerId))
 
-    local result = MySQL.query.await("SELECT allowed_ids FROM bcchousing WHERE houseid = ?", { houseId })
+    local result = DB.query("SELECT allowed_ids FROM bcchousing WHERE houseid = ?", houseId)
     if not result or #result == 0 then
         DBG:Info("No house found with ID: " .. tostring(houseId) .. " or allowed_ids is empty.")
         NotifyClient(src, _U("noSuchHouseId"), 4000, "error")
@@ -203,10 +203,10 @@ BccUtils.RPC:Register('bcc-housing:RemovePlayerAccess', function(params, cb, src
         return
     end
 
-    local affectedRows = MySQL.update.await("UPDATE bcchousing SET allowed_ids = ? WHERE houseid = ?", {
+    local affectedRows = DB.exec("UPDATE bcchousing SET allowed_ids = ? WHERE houseid = ?",
         json.encode(allowedIds),
         houseId
-    })
+    )
 
     if affectedRows and affectedRows > 0 then
         DBG:Info("Removed player access successfully for Player ID: " .. tostring(playerId))

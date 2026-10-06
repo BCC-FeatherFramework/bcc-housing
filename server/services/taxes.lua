@@ -133,7 +133,7 @@ CreateThread(function() --Tax handling
 
         if currentDateKey ~= lastProcessedDate then
             lastProcessedDate = currentDateKey
-            local result = MySQL.query.await("SELECT * FROM bcchousing")
+            local result = DB.query("SELECT * FROM bcchousing")
             if #result > 0 then
                 for k, v in pairs(result) do
                     local taxAmount = tonumber(v.tax_amount) or 0
@@ -147,20 +147,20 @@ CreateThread(function() --Tax handling
                     if hasUnprocessedDue then
                         local taxStatus = tostring(v.taxes_collected)
                         if taxStatus == 'overdue' or taxStatus == 'released' then
-                            MySQL.update.await(
+                            DB.exec(
                                 "UPDATE bcchousing SET last_tax_processed_at = ? WHERE houseid = ?",
-                                { latestDueKey, v.houseid }
+                                latestDueKey, v.houseid
                             )
                         elseif ledgerAmount < taxAmount then
-                            MySQL.update.await(
+                            DB.exec(
                                 "UPDATE bcchousing SET taxes_collected = 'overdue', last_tax_processed_at = ? WHERE houseid = ?",
-                                { latestDueKey, v.houseid }
+                                latestDueKey, v.houseid
                             )
                             sendTaxWebhook(v, "overdue")
                         else
-                            MySQL.update.await(
+                            DB.exec(
                                 "UPDATE bcchousing SET ledger = ledger - ?, taxes_collected = 'true', last_tax_processed_at = ? WHERE houseid = ?",
-                                { taxAmount, latestDueKey, v.houseid }
+                                taxAmount, latestDueKey, v.houseid
                             )
                             sendTaxWebhook(v, "paid")
                         end

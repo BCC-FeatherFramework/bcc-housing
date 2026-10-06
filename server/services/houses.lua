@@ -232,11 +232,13 @@ local function handleCreationDBInsert(src, tpHouse, owner, radius, doors, houseC
         }
     end
 
-    local result = MySQL.query.await('SELECT * FROM bcchousing WHERE charidentifier=@charidentifier', param)
+    local result = DB.query('SELECT * FROM bcchousing WHERE charidentifier=?', param.charidentifier)
     if #result < Config.Setup.MaxHousePerChar then
-        MySQL.insert(
-            'INSERT INTO bcchousing ( `charidentifier`,`house_radius_limit`,`doors`,`house_coords`,`invlimit`,`tax_amount`,`tpInt`,`tpInstance`, `uniqueName`, `ownershipStatus`, `purchaseCurrencyType`, `poly_points`, `poly_min_z`, `poly_max_z`, `purchased_at`) VALUES ( @charidentifier,@radius,@doors,@houseCoords,@invlimit,@taxes,@tpInt,@tpInstance, @uniqueName, @ownershipStatus, @purchaseCurrencyType, @polyPoints, @polyMinZ, @polyMaxZ, NOW() )',
-            param
+        DB.exec(
+            'INSERT INTO bcchousing ( `charidentifier`,`house_radius_limit`,`doors`,`house_coords`,`invlimit`,`tax_amount`,`tpInt`,`tpInstance`, `uniqueName`, `ownershipStatus`, `purchaseCurrencyType`, `poly_points`, `poly_min_z`, `poly_max_z`, `purchased_at`) VALUES ( ?,?,?,?,?,?,?,?, ?, ?, ?, ?, ?, ?, NOW() )',
+            param.charidentifier, param.radius, param.doors, param.houseCoords, param.invlimit, param.taxes,
+            param.tpInt, param.tpInstance, param.uniqueName, param.ownershipStatus, param.purchaseCurrencyType,
+            param.polyPoints, param.polyMinZ, param.polyMaxZ
         )
 
         Discord:sendMessage(_U('houseCreatedWebhook') ..
@@ -314,9 +316,9 @@ BccUtils.RPC:Register('bcc-housing:SaveExistingHousePolyZone', function(params, 
         return
     end
 
-    local affectedRows = MySQL.update.await(
+    local affectedRows = DB.exec(
         'UPDATE bcchousing SET poly_points = ?, poly_min_z = ?, poly_max_z = ? WHERE houseid = ?',
-        { encodedPolyPoints, polyMinZ, polyMaxZ, houseId }
+        encodedPolyPoints, polyMinZ, polyMaxZ, houseId
     )
 
     if not affectedRows or affectedRows <= 0 then
@@ -376,7 +378,7 @@ local function refreshPlayerHouses(targetSource)
 
     DBG:Info("Checking if player owns or has access to a house for character ID: " .. charIdentifierString)
 
-    local result = MySQL.query.await("SELECT * FROM bcchousing", {})
+    local result = DB.query("SELECT * FROM bcchousing")
     local accessibleHouses = {}
 
     if result and #result > 0 then
@@ -480,7 +482,7 @@ BccUtils.RPC:Register('bcc-house:OpenHouseInv', function(params, cb, src)
     local charIdentifier = character.charIdentifier
     DBG:Info("Opening house inventory for House ID: " .. tostring(houseId) .. " and character ID: " .. tostring(charIdentifier))
 
-    local result = MySQL.query.await("SELECT * FROM bcchousing WHERE houseid = ?", { houseId })
+    local result = DB.query("SELECT * FROM bcchousing WHERE houseid = ?", houseId)
     if not result or #result == 0 then
         DBG:Error("Error: No results found for house ID: " .. tostring(houseId))
         if cb then cb(false, { error = _U('noHouseFound') }) end
@@ -536,7 +538,7 @@ BccUtils.RPC:Register('bcc-house:AdminOpenHouseInv', function(params, cb, src)
         return
     end
 
-    local result = MySQL.query.await("SELECT * FROM bcchousing WHERE houseid = ?", { houseId })
+    local result = DB.query("SELECT * FROM bcchousing WHERE houseid = ?", houseId)
     if not result or #result == 0 then
         if cb then cb(false, { error = _U('noHouseFound') }) end
         return
@@ -557,7 +559,7 @@ BccUtils.RPC:Register('bcc-housing:GetInventoryStages', function(params, cb, src
         return
     end
 
-    local result = MySQL.query.await("SELECT invlimit, ownershipStatus, taxes_collected, charidentifier, inventory_current_stage FROM bcchousing WHERE houseid = ?", { houseId })
+    local result = DB.query("SELECT invlimit, ownershipStatus, taxes_collected, charidentifier, inventory_current_stage FROM bcchousing WHERE houseid = ?", houseId)
     if not result or #result == 0 then
         if cb then cb(false, { error = _U('noHouseFound') }) end
         return
@@ -609,7 +611,7 @@ BccUtils.RPC:Register('bcc-housing:UpgradeInventory', function(params, cb, src)
         return
     end
 
-    local result = MySQL.query.await("SELECT invlimit, ownershipStatus, charidentifier, inventory_current_stage FROM bcchousing WHERE houseid = ?", { houseId })
+    local result = DB.query("SELECT invlimit, ownershipStatus, charidentifier, inventory_current_stage FROM bcchousing WHERE houseid = ?", houseId)
     if not result or #result == 0 then
         if cb then cb(false, { error = _U('noHouseFound') }) end
         return
@@ -636,7 +638,7 @@ BccUtils.RPC:Register('bcc-housing:UpgradeInventory', function(params, cb, src)
     end
 
     character.removeCurrency(0, stageCost)
-    MySQL.update.await("UPDATE bcchousing SET inventory_current_stage = ? WHERE houseid = ?", { nextStage.stage, houseId })
+    DB.exec("UPDATE bcchousing SET inventory_current_stage = ? WHERE houseid = ?", nextStage.stage, houseId)
 
     local finalLimit = select(1, calculateFinalInventoryLimit(row.invlimit, row.ownershipStatus, nextStage.stage))
     ensureHouseInventoryRegistered(houseId, {
@@ -691,7 +693,7 @@ BccUtils.RPC:Register("bcc-housing:GetDoorsByHouseId", function(params, cb, recS
     end
 
     -- Fetch the doors JSON for the given house ID from bcchousing
-    local houseResult = MySQL.query.await("SELECT doors FROM bcchousing WHERE houseid = ?", { houseId })
+    local houseResult = DB.query("SELECT doors FROM bcchousing WHERE houseid = ?", houseId)
 
     if houseResult and #houseResult > 0 then
         local houseDoors = json.decode(houseResult[1].doors or "[]")
@@ -728,7 +730,7 @@ BccUtils.RPC:Register("bcc-housing:GetAllowedIdsForHouse", function(params, cb, 
     end
 
     -- Fetch allowed IDs for the house
-    local result = MySQL.query.await("SELECT allowed_ids FROM bcchousing WHERE houseid = ?", { houseId })
+    local result = DB.query("SELECT allowed_ids FROM bcchousing WHERE houseid = ?", houseId)
 
     if result and #result > 0 then
         local allowedIds = json.decode(result[1].allowed_ids or "[]")
@@ -755,7 +757,7 @@ BccUtils.RPC:Register("bcc-housing:AddDoorToHouse", function(params, cb, recSour
     end
 
     -- Fetch the current doors for the specified house
-    local result = MySQL.query.await("SELECT doors FROM bcchousing WHERE houseid = ?", { houseId })
+    local result = DB.query("SELECT doors FROM bcchousing WHERE houseid = ?", houseId)
     if not result or #result == 0 then
         cb(false) -- House not found
         return
@@ -769,7 +771,7 @@ BccUtils.RPC:Register("bcc-housing:AddDoorToHouse", function(params, cb, recSour
 
     -- Update the doors in the database
     local updatedDoors = json.encode(currentDoors)
-    local success = MySQL.query.await("UPDATE bcchousing SET doors = ? WHERE houseid = ?", { updatedDoors, houseId })
+    local success = DB.exec("UPDATE bcchousing SET doors = ? WHERE houseid = ?", updatedDoors, houseId)
 
     if success then
         cb(true) -- Door added successfully
@@ -916,7 +918,7 @@ local function handleLedgerHandling(src, amountParam, houseIdParam, isAdding, cb
         return
     end
 
-    local queryResult = MySQL.query.await('SELECT ledger, tax_amount, taxes_collected, ownershipStatus, uniqueName, charidentifier, purchaseCurrencyType FROM bcchousing WHERE houseid = ?', { houseIdNumber })
+    local queryResult = DB.query('SELECT ledger, tax_amount, taxes_collected, ownershipStatus, uniqueName, charidentifier, purchaseCurrencyType FROM bcchousing WHERE houseid = ?', houseIdNumber)
     if not queryResult or #queryResult == 0 then
         NotifyClient(src, _U('noHouseFound'), 5000, 'error')
         if cbFn then cbFn(false) end
@@ -1018,15 +1020,15 @@ local function handleLedgerHandling(src, amountParam, houseIdParam, isAdding, cb
         local taxesPaid = false
         if isReleasedForPayment and (ledger + insertionAmount) >= taxAmount then
             local remainingLedger = math.max((ledger + insertionAmount) - taxAmount, 0)
-            affectedRows = MySQL.update.await(
+            affectedRows = DB.exec(
                 'UPDATE bcchousing SET ledger = ?, taxes_collected = ? WHERE houseid = ? AND charidentifier = ?',
-                { remainingLedger, 'true', houseIdNumber, character.charIdentifier }
+                remainingLedger, 'true', houseIdNumber, character.charIdentifier
             )
             taxesPaid = true
         else
-            affectedRows = MySQL.update.await(
+            affectedRows = DB.exec(
                 'UPDATE bcchousing SET ledger = ledger + ? WHERE houseid = ? AND charidentifier = ? AND ledger + ? <= tax_amount',
-                { insertionAmount, houseIdNumber, character.charIdentifier, insertionAmount }
+                insertionAmount, houseIdNumber, character.charIdentifier, insertionAmount
             )
         end
 
@@ -1057,9 +1059,9 @@ local function handleLedgerHandling(src, amountParam, houseIdParam, isAdding, cb
             return
         end
 
-        local affectedRows = MySQL.update.await(
+        local affectedRows = DB.exec(
             'UPDATE bcchousing SET ledger = ledger - ? WHERE houseid = ? AND charidentifier = ? AND ledger >= ?',
-            { amountNumber, houseIdNumber, character.charIdentifier, amountNumber }
+            amountNumber, houseIdNumber, character.charIdentifier, amountNumber
         )
         if affectedRows and affectedRows > 0 then
             character.addCurrency(currency, amountNumber)
@@ -1100,7 +1102,7 @@ local function handleCheckLedger(src, houseIdParam, cb)
     end
 
     DBG:Info('Checking ledger for house ID: ' .. tostring(houseId))
-    local result = MySQL.query.await('SELECT ledger, tax_amount FROM bcchousing WHERE houseid=@houseid', { ['houseid'] = houseId })
+    local result = DB.query('SELECT ledger, tax_amount FROM bcchousing WHERE houseid=?', houseId)
     if result and #result > 0 then
         NotifyClient(src, tostring(result[1].ledger) .. '/' .. tostring(result[1].tax_amount), 5000, 'info')
         if cbFn then cbFn(true, { ledger = tonumber(result[1].ledger) or 0, taxAmount = tonumber(result[1].tax_amount) or 0 }) end
@@ -1138,7 +1140,7 @@ BccUtils.RPC:Register('bcc-housing:getHouseId', function(params, cb, src)
     local charIdentifier = character.charIdentifier
     DBG:Info(("getHouseId RPC invoked with charidentifier %s for House ID %s"):format(tostring(charIdentifier), tostring(houseId)))
 
-    local result = MySQL.query.await("SELECT * FROM bcchousing WHERE houseid = ?", { houseId })
+    local result = DB.query("SELECT * FROM bcchousing WHERE houseid = ?", houseId)
     if not result or #result == 0 then
         DBG:Error("Error: No results found for house ID: " .. tostring(houseId))
         if cb then cb(false, { error = _U('noHouseFound') }) end
@@ -1213,7 +1215,7 @@ BccUtils.RPC:Register('bcc-housing:getHouseOwner', function(params, cb, src)
     local charIdentifier = character.charIdentifier
     DBG:Info(("getHouseOwner RPC invoked with charidentifier %s for House ID %s"):format(tostring(charIdentifier), tostring(houseId)))
 
-    local result = MySQL.query.await("SELECT * FROM bcchousing WHERE houseid = @houseid", { ['@houseid'] = houseId })
+    local result = DB.query("SELECT * FROM bcchousing WHERE houseid = ?", houseId)
     if not result or #result == 0 then
         DBG:Error("Error: No results found for house ID: " .. tostring(houseId))
         if cb then cb(false, { error = _U('noHouseFound') }) end
@@ -1257,9 +1259,9 @@ BccUtils.RPC:Register('bcc-housing:GetHouseContext', function(params, cb, src)
     end
 
     local charIdentifier = tostring(character.charIdentifier)
-    local result = MySQL.query.await(
+    local result = DB.query(
         "SELECT house_coords, house_radius_limit, tpInt, tpInstance, ownershipStatus, taxes_collected, purchased_at, charidentifier, allowed_ids, poly_points, poly_min_z, poly_max_z FROM bcchousing WHERE houseid = ?",
-        { houseId })
+        houseId)
 
     if not result or #result == 0 then
         if cb then cb(false, { error = _U('noHouseFound') }) end
@@ -1329,7 +1331,7 @@ BccUtils.RPC:Register('bcc-housing:CheckIfHouseExists', function(params, cb, src
         return
     end
 
-    local result = MySQL.query.await('SELECT houseid FROM bcchousing WHERE houseid = ?', { houseId })
+    local result = DB.query('SELECT houseid FROM bcchousing WHERE houseid = ?', houseId)
     local exists = result and #result > 0
 
     if cb then cb(true, { exists = exists, houseId = houseId }) end
