@@ -31,7 +31,7 @@ client_scripts {
 }
 
 server_scripts {
-    '@feather-mysql/lib/MySQL.lua',
+    '@feather-mysql/lib/DB.lua',
     'server/helpers/functions.lua',
     'server/helpers/propertyDocuments.lua',
     'server/services/*.lua',

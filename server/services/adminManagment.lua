@@ -16,7 +16,7 @@ local function formatPurchasedAt(value)
 end
 
 local function collectAdminHouseData()
-    local result = MySQL.query.await('SELECT * FROM bcchousing')
+    local result = DB.query('SELECT * FROM bcchousing')
     if not result then
         DBG:Error('Error: No house data found in the database.')
         return {}
@@ -31,7 +31,7 @@ local function collectAdminHouseData()
         DBG:Info('Processing house with ID:', houseInfo.houseid, 'and character identifier:', houseCharIdentifier)
 
         if houseCharIdentifier then
-            local characterData = MySQL.query.await('SELECT firstname, lastname FROM characters WHERE charidentifier = ?', { houseCharIdentifier })
+            local characterData = DB.query('SELECT firstname, lastname FROM characters WHERE charidentifier = ?', houseCharIdentifier)
 
             if characterData and #characterData > 0 then
                 houseInfo.firstName = characterData[1].firstname
@@ -85,17 +85,14 @@ BccUtils.RPC:Register('bcc-house:AdminManagementDelHouse', function(params, cb, 
         return
     end
 
-    local param = { ['houseid'] = houseId }
-    exports['feather-mysql']:query("DELETE FROM bcchousing WHERE houseid=@houseid", param, function(result)
-        local success = type(result) == "table" and result.affectedRows and result.affectedRows > 0
-        if success then
-            NotifyClient(src, _U('housesDeleted'), 5000, "success")
-            if cb then cb(true) end
-        else
-            NotifyClient(src, _U('failedDeleteHouse'), 5000, "error")
-            if cb then cb(false) end
-        end
-    end)
+    local affected = DB.exec("DELETE FROM bcchousing WHERE houseid=?", houseId)
+    if affected and affected > 0 then
+        NotifyClient(src, _U('housesDeleted'), 5000, "success")
+        if cb then cb(true) end
+    else
+        NotifyClient(src, _U('failedDeleteHouse'), 5000, "error")
+        if cb then cb(false) end
+    end
 end)
 
 BccUtils.RPC:Register('bcc-house:AdminManagementChangeHouseRadius', function(params, cb, src)
@@ -112,18 +109,14 @@ BccUtils.RPC:Register('bcc-house:AdminManagementChangeHouseRadius', function(par
         return
     end
 
-    local param = { ['houseid'] = houseId, ['house_radius_limit'] = radius }
-    exports['feather-mysql']:query("UPDATE bcchousing SET `house_radius_limit`=@house_radius_limit WHERE houseid=@houseid",
-        param, function(result)
-            local success = type(result) == "table" and result.affectedRows and result.affectedRows > 0
-            if success then
-                NotifyClient(src, _U('radiusUpdatedSuccess'), 5000, "success")
-                if cb then cb(true) end
-            else
-                NotifyClient(src, _U('radiusUpdatedFailed'), 5000, "error")
-                if cb then cb(false) end
-            end
-        end)
+    local affected = DB.exec("UPDATE bcchousing SET `house_radius_limit`=? WHERE houseid=?", radius, houseId)
+    if affected and affected > 0 then
+        NotifyClient(src, _U('radiusUpdatedSuccess'), 5000, "success")
+        if cb then cb(true) end
+    else
+        NotifyClient(src, _U('radiusUpdatedFailed'), 5000, "error")
+        if cb then cb(false) end
+    end
 end)
 
 BccUtils.RPC:Register('bcc-house:AdminManagementChangeInvLimit', function(params, cb, src)
@@ -140,17 +133,14 @@ BccUtils.RPC:Register('bcc-house:AdminManagementChangeInvLimit', function(params
         return
     end
 
-    local param = { ['houseid'] = houseId, ['invlimit'] = tostring(invLimit) }
-    exports['feather-mysql']:query("UPDATE bcchousing SET `invlimit`=@invlimit WHERE houseid=@houseid", param, function(result)
-        local success = type(result) == "table" and result.affectedRows and result.affectedRows > 0
-        if success then
-            NotifyClient(src, _U('invUpdatedSuccess'), 5000, "success")
-            if cb then cb(true) end
-        else
-            NotifyClient(src, _U('invUpdatedFailed'), 5000, "error")
-            if cb then cb(false) end
-        end
-    end)
+    local affected = DB.exec("UPDATE bcchousing SET `invlimit`=? WHERE houseid=?", tostring(invLimit), houseId)
+    if affected and affected > 0 then
+        NotifyClient(src, _U('invUpdatedSuccess'), 5000, "success")
+        if cb then cb(true) end
+    else
+        NotifyClient(src, _U('invUpdatedFailed'), 5000, "error")
+        if cb then cb(false) end
+    end
 end)
 
 BccUtils.RPC:Register('bcc-house:AdminManagementChangeTaxAmount', function(params, cb, src)
@@ -167,18 +157,14 @@ BccUtils.RPC:Register('bcc-house:AdminManagementChangeTaxAmount', function(param
         return
     end
 
-    local param = { ['houseid'] = houseId, ['tax_amount'] = tax }
-    exports['feather-mysql']:query("UPDATE bcchousing SET `tax_amount`=@tax_amount WHERE houseid=@houseid", param,
-        function(result)
-        local success = type(result) == "table" and result.affectedRows and result.affectedRows > 0
-        if success then
-            NotifyClient(src, _U('taxUpdatedSuccess'), 5000, "success")
-            if cb then cb(true) end
-        else
-            NotifyClient(src, _U('taxUpdatedFailed'), 5000, "error")
-            if cb then cb(false) end
-        end
-        end)
+    local affected = DB.exec("UPDATE bcchousing SET `tax_amount`=? WHERE houseid=?", tax, houseId)
+    if affected and affected > 0 then
+        NotifyClient(src, _U('taxUpdatedSuccess'), 5000, "success")
+        if cb then cb(true) end
+    else
+        NotifyClient(src, _U('taxUpdatedFailed'), 5000, "error")
+        if cb then cb(false) end
+    end
 end)
 
 BccUtils.RPC:Register('bcc-house:AdminReleaseHouseTaxPayment', function(params, cb, src)
@@ -194,9 +180,9 @@ BccUtils.RPC:Register('bcc-house:AdminReleaseHouseTaxPayment', function(params, 
         return
     end
 
-    local affectedRows = MySQL.update.await(
+    local affectedRows = DB.exec(
         "UPDATE bcchousing SET taxes_collected = 'released' WHERE houseid = ? AND taxes_collected = 'overdue'",
-        { houseId }
+        houseId
     )
 
     if affectedRows and affectedRows > 0 then

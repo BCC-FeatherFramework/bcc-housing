@@ -12,7 +12,7 @@ local function findHotelConfig(hotelId)
 end
 
 local function loadOwnedHotels(charId)
-    local result = MySQL.query.await('SELECT `hotels` FROM `bcchousinghotels` WHERE `charidentifier` = ?', { charId })
+    local result = DB.query('SELECT `hotels` FROM `bcchousinghotels` WHERE `charidentifier` = ?', charId)
     local payload = result and result[1] and result[1].hotels
     if not payload or payload == '' or payload == 'none' then
         return {}
@@ -42,9 +42,9 @@ BccUtils.RPC:Register('bcc-housing:HotelDbRegistry', function(params, cb, src)
     end
     local charId = character.charIdentifier
 
-    local result = MySQL.query.await('SELECT * FROM `bcchousinghotels` WHERE `charidentifier` = ?', { charId })
+    local result = DB.query('SELECT * FROM `bcchousinghotels` WHERE `charidentifier` = ?', charId)
     if #result == 0 then
-        MySQL.query.await('INSERT INTO `bcchousinghotels` (`charidentifier`, `hotels`) VALUES (?, ?)', { charId, 'none' })
+        DB.exec('INSERT INTO `bcchousinghotels` (`charidentifier`, `hotels`) VALUES (?, ?)', charId, 'none')
         result = { { hotels = 'none' } }
     end
 
@@ -91,14 +91,14 @@ BccUtils.RPC:Register('bcc-housing:HotelBought', function(params, cb, src)
         return
     end
 
-    MySQL.query.await('INSERT INTO `bcchousinghotels` (`charidentifier`, `hotels`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `charidentifier` = VALUES(`charidentifier`)', { charId, 'none' })
+    DB.exec('INSERT INTO `bcchousinghotels` (`charidentifier`, `hotels`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `charidentifier` = VALUES(`charidentifier`)', charId, 'none')
 
     local ownedHotelsTable = loadOwnedHotels(charId)
     table.insert(ownedHotelsTable, hotelTable.hotelId)
     local updatedHotels = json.encode(ownedHotelsTable)
 
     character.removeCurrency(0, hotelCost)
-    MySQL.query.await('UPDATE `bcchousinghotels` SET `hotels` = ? WHERE `charidentifier` = ?', { updatedHotels, charId })
+    DB.exec('UPDATE `bcchousinghotels` SET `hotels` = ? WHERE `charidentifier` = ?', updatedHotels, charId)
 
     if cb then cb(true, ownedHotelsTable) end
 end)
