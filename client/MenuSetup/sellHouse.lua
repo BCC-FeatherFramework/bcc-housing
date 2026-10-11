@@ -51,7 +51,7 @@ function sellHouseConfirmation(houseId, ownershipStatus)
         slot = "footer",
         style = {}
     }, function()
-        local success, err = BccUtils.RPC:CallAsync('bcc-housing:sellHouse', { houseId = houseId })
+        local success, err = HousingRPC:CallAsync('bcc-housing:sellHouse', { houseId = houseId })
         if success then
             RemoveManagePrompt()
         else
@@ -267,7 +267,7 @@ function OpenConfirmSellHouseMenu(houseId, targetPlayerId, targetPlayerName, wit
     }, function()
         BCCHousingMenu:Close()
         if withInventory then
-            local success, err = BccUtils.RPC:CallAsync('bcc-housing:sellHouseToPlayerWithInventory', {
+            local success, err = HousingRPC:CallAsync('bcc-housing:sellHouseToPlayerWithInventory', {
                 houseId = houseId,
                 targetPlayerId = targetPlayerId,
                 salePrice = salePrice
@@ -278,7 +278,7 @@ function OpenConfirmSellHouseMenu(houseId, targetPlayerId, targetPlayerName, wit
                 DBG:Info("sellHouseToPlayerWithInventory RPC failed: " .. tostring(err and err.error))
             end
         else
-            local success, err = BccUtils.RPC:CallAsync('bcc-housing:sellHouseToPlayerWithoutInventory', {
+            local success, err = HousingRPC:CallAsync('bcc-housing:sellHouseToPlayerWithoutInventory', {
                 houseId = houseId,
                 targetPlayerId = targetPlayerId,
                 salePrice = salePrice

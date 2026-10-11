@@ -1,4 +1,4 @@
-BccUtils.RPC:Register('bcc-housing:CheckIfAdmin', function(params, cb, src)
+HousingRPC:Register('bcc-housing:CheckIfAdmin', function(params, cb, src)
     local user = VORPcore.getUser(src)
     if not user then return cb(false) end
 
@@ -16,7 +16,7 @@ BccUtils.RPC:Register('bcc-housing:CheckIfAdmin', function(params, cb, src)
     cb(false)
 end)
 
-BccUtils.RPC:Register('bcc-housing:CheckJob', function(params, cb, src)
+HousingRPC:Register('bcc-housing:CheckJob', function(params, cb, src)
     local location = params and params.location
     local user = VORPcore.getUser(src)
     if not user or not location then return cb(false) end

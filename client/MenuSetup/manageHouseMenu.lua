@@ -2,7 +2,7 @@ InTpHouse, CurrentTpHouse, BreakHandleLoop = false, nil, false
 local PlayerAccessibleHouses = {}
 local HousingAccessMenu
 
-BccUtils.RPC:Register('bcc-housing:ReceiveAccessibleHouses', function(params)
+HousingRPC:Register('bcc-housing:ReceiveAccessibleHouses', function(params)
     DBG:Info("Received accessible houses list via RPC")
     PlayerAccessibleHouses = params and params.houses or {}
 end)
@@ -39,7 +39,7 @@ end
 
 local function afterGivingAccess(houseId, playerId, playerServerId, completion)
     if houseId and playerId and playerServerId then
-        local success = BccUtils.RPC:CallAsync('bcc-housing:NewPlayerGivenAccess', {
+        local success = HousingRPC:CallAsync('bcc-housing:NewPlayerGivenAccess', {
             charIdentifier = playerId,
             houseId = houseId,
             recSource = playerServerId
@@ -58,7 +58,7 @@ end
 local function afterRemoveAccess(houseId, playerId)
     DBG:Info("Attempting to remove access with House ID: " .. tostring(houseId) .. ", Player ID: " .. tostring(playerId))
     if houseId and playerId then
-        local success = BccUtils.RPC:CallAsync('bcc-housing:RemovePlayerAccess', {
+        local success = HousingRPC:CallAsync('bcc-housing:RemovePlayerAccess', {
             houseId = houseId,
             playerId = playerId
         })
@@ -150,7 +150,7 @@ local function openLedgerMenu(houseId, isOwner, ownershipStatus, parentRoute, pa
         label = _U("checkledger"),
         style = {}
     }, function()
-        local success, err = BccUtils.RPC:CallAsync('bcc-housing:CheckLedger', { houseid = houseId })
+        local success, err = HousingRPC:CallAsync('bcc-housing:CheckLedger', { houseid = houseId })
         if not success then
             DBG:Info("CheckLedger RPC failed: " .. tostring(err and err.error))
         end
@@ -230,7 +230,7 @@ local function openHousingInventoryPage(houseId, isOwner, parentMenu)
         return
     end
 
-    local success, stageData = BccUtils.RPC:CallAsync('bcc-housing:GetInventoryStages', { houseId = houseId })
+    local success, stageData = HousingRPC:CallAsync('bcc-housing:GetInventoryStages', { houseId = houseId })
     if not success or not stageData then
         Notify((stageData and stageData.error) or _U('inventoryStageFetchFailed'), 'error', 4000)
         return
@@ -293,7 +293,7 @@ local function openHousingInventoryPage(houseId, isOwner, parentMenu)
         label = _U("openHouseInventory"),
         style = {}
     }, function()
-        local invSuccess, response = BccUtils.RPC:CallAsync('bcc-house:OpenHouseInv', { houseId = houseId })
+        local invSuccess, response = HousingRPC:CallAsync('bcc-house:OpenHouseInv', { houseId = houseId })
         if not invSuccess then
             notifyNoAccess(response and response.error)
         end
@@ -305,7 +305,7 @@ local function openHousingInventoryPage(houseId, isOwner, parentMenu)
             label = upgradeLabel,
             style = {}
         }, function()
-            local upgradeSuccess, upgradeResponse = BccUtils.RPC:CallAsync('bcc-housing:UpgradeInventory', {
+            local upgradeSuccess, upgradeResponse = HousingRPC:CallAsync('bcc-housing:UpgradeInventory', {
                 houseId = houseId,
                 nextStage = nextStage.stage
             })
@@ -637,7 +637,7 @@ function OpenHousingMainMenu(houseId, isOwner, ownershipStatus, taxPaymentReleas
                     return
                 end
 
-                local success, data = BccUtils.RPC:CallAsync('bcc-housing:getHouseId', {
+                local success, data = HousingRPC:CallAsync('bcc-housing:getHouseId', {
                     context = 'access',
                     houseId = houseId
                 })
@@ -660,7 +660,7 @@ function OpenHousingMainMenu(houseId, isOwner, ownershipStatus, taxPaymentReleas
                     return
                 end
 
-                local success, data = BccUtils.RPC:CallAsync('bcc-housing:getHouseId', {
+                local success, data = HousingRPC:CallAsync('bcc-housing:getHouseId', {
                     context = 'removeAccess',
                     houseId = houseId
                 })
@@ -710,7 +710,7 @@ function OpenHousingMainMenu(houseId, isOwner, ownershipStatus, taxPaymentReleas
 
                     if newDoorId then
                         DBG:Info("Door created and player added successfully: " .. tostring(newDoorId))
-                        BccUtils.RPC:Call("bcc-housing:AddDoorToHouse",
+                        HousingRPC:Call("bcc-housing:AddDoorToHouse",
                             { houseId = houseId, newDoor = newDoorId },
                             function(success)
                                 if success then
@@ -745,7 +745,7 @@ function OpenHousingMainMenu(houseId, isOwner, ownershipStatus, taxPaymentReleas
                     return
                 end
 
-                BccUtils.RPC:Call("bcc-housing:GetDoorsByHouseId", { houseId = currentHouseId }, function(doors)
+                HousingRPC:Call("bcc-housing:GetDoorsByHouseId", { houseId = currentHouseId }, function(doors)
                     if not doors or #doors == 0 then
                         doorListPage:RegisterElement('textdisplay', {
                             value = _U("noDoorsFound"),
@@ -792,7 +792,7 @@ function OpenHousingMainMenu(houseId, isOwner, ownershipStatus, taxPaymentReleas
                                             label = _U("confirmYes"),
                                             style = {}
                                         }, function()
-                                            BccUtils.RPC:Call("bcc-housing:DeleteDoor", { doorId = door.doorid },
+                                            HousingRPC:Call("bcc-housing:DeleteDoor", { doorId = door.doorid },
                                                 function(success)
                                                     if success then
                                                         Notify(_U("doorRemoved"), "success", 4000)
@@ -834,7 +834,7 @@ function OpenHousingMainMenu(houseId, isOwner, ownershipStatus, taxPaymentReleas
                                     label = _U('giveAccesstoDoor'),
                                     style = {}
                                 }, function()
-                                    BccUtils.RPC:Call("bcc-housing:GetPlayersWithAccess", { houseId = houseId },
+                                    HousingRPC:Call("bcc-housing:GetPlayersWithAccess", { houseId = houseId },
                                         function(players)
                                             if not players or #players == 0 then
                                                 Notify(_U('doorNoUsersWithAccess'), "error", 4000)
@@ -861,7 +861,7 @@ function OpenHousingMainMenu(houseId, isOwner, ownershipStatus, taxPaymentReleas
                                                         return
                                                     end
 
-                                                    BccUtils.RPC:Call("bcc-housing:GiveAccessToDoor",
+                                                    HousingRPC:Call("bcc-housing:GiveAccessToDoor",
                                                         { doorId = door.doorid, userId = player.charidentifier },
                                                         function(success)
                                                             if success then
@@ -904,7 +904,7 @@ function OpenHousingMainMenu(houseId, isOwner, ownershipStatus, taxPaymentReleas
                                     label = _U('removeAccessFromDoor'),
                                     style = {}
                                 }, function()
-                                    BccUtils.RPC:Call("bcc-housing:GetPlayersWithAccess", { houseId = houseId },
+                                    HousingRPC:Call("bcc-housing:GetPlayersWithAccess", { houseId = houseId },
                                         function(players)
                                             if not players or #players == 0 then
                                                 Notify(_U('doorNoUsersWithAccess'), "error", 4000)
@@ -931,7 +931,7 @@ function OpenHousingMainMenu(houseId, isOwner, ownershipStatus, taxPaymentReleas
                                                         return
                                                     end
 
-                                                    BccUtils.RPC:Call("bcc-housing:RemoveAccessFromDoor",
+                                                    HousingRPC:Call("bcc-housing:RemoveAccessFromDoor",
                                                         { doorId = door.doorid, userId = player.charidentifier },
                                                         function(success)
                                                             if success then
@@ -1095,7 +1095,7 @@ function OpenHousingMainMenu(houseId, isOwner, ownershipStatus, taxPaymentReleas
                     label = _U("confirmYes"),
                     style = {}
                 }, function()
-                    local success, err = BccUtils.RPC:CallAsync('bcc-housing:unrentHouse', { houseId = houseId })
+                    local success, err = HousingRPC:CallAsync('bcc-housing:unrentHouse', { houseId = houseId })
                     if not success then
                         DBG:Info("unrentHouse RPC failed: " .. tostring(err and err.error))
                     end
@@ -1219,7 +1219,7 @@ AddEventHandler('bcc-housing:addLedger', function(houseId, isOwner)
     }, function()
         if amountToInsert then
             DBG:Info("Submitting ledger update for amount: " .. tostring(amountToInsert) .. " (Adding)")
-            local success, err = BccUtils.RPC:CallAsync('bcc-housing:LedgerHandling', {
+            local success, err = HousingRPC:CallAsync('bcc-housing:LedgerHandling', {
                 amount = amountToInsert,
                 houseid = houseId,
                 isAdding = true
@@ -1238,7 +1238,7 @@ AddEventHandler('bcc-housing:addLedger', function(houseId, isOwner)
                         HouseTaxPaymentReleased = false
                     end
                 end
-                BccUtils.RPC:CallAsync('bcc-housing:CheckIfHasHouse', {})
+                HousingRPC:CallAsync('bcc-housing:CheckIfHasHouse', {})
             end
             BCCHousingMenu:Close()
         else
@@ -1302,7 +1302,7 @@ AddEventHandler('bcc-housing:removeLedger', function(houseId, isOwner)
     }, function()
         if amountToInsert then
             DBG:Info("Submitting ledger update for amount: " .. tostring(amountToInsert) .. " (Removing)")
-            local success, err = BccUtils.RPC:CallAsync('bcc-housing:LedgerHandling', {
+            local success, err = HousingRPC:CallAsync('bcc-housing:LedgerHandling', {
                 amount = amountToInsert,
                 houseid = houseId,
                 isAdding = false

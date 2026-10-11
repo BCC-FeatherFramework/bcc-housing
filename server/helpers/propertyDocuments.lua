@@ -113,7 +113,7 @@ function RemoveHousePropertyDocument(source, houseId)
     end)
 end
 
-BccUtils.RPC:Register("bcc-housing:GetOwnedPropertyDocuments", function(_, cb, src)
+HousingRPC:Register("bcc-housing:GetOwnedPropertyDocuments", function(_, cb, src)
     local user = VORPcore.getUser(src)
     local character = user and user.getUsedCharacter
     if not character then
@@ -142,7 +142,7 @@ BccUtils.RPC:Register("bcc-housing:GetOwnedPropertyDocuments", function(_, cb, s
     cb(true, items)
 end)
 
-BccUtils.RPC:Register("bcc-housing:IssuePropertyDocument", function(params, cb, src)
+HousingRPC:Register("bcc-housing:IssuePropertyDocument", function(params, cb, src)
     local houseId = tonumber(params and params.houseId)
     if not houseId then
         cb(false, { error = "invalid_house" })

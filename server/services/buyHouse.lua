@@ -168,8 +168,8 @@ local function handleHousePurchase(src, houseCoords, moneyTypeParam, cb)
     insertHouseDoors(selectedHouse.doors, character.charIdentifier, houseId, selectedHouse.uniqueName)
     GiveHousePropertyDocument(src, character, selectedHouse, houseId, ownershipStatus)
 
-    BccUtils.RPC:Notify('bcc-housing:clearBlips', { houseId = selectedHouse.houseId }, src)
-    BccUtils.RPC:Notify('bcc-housing:housePurchased', { houseCoords = coordsToPayload(selectedHouse.houseCoords) }, src)
+    HousingRPC:Notify('bcc-housing:clearBlips', { houseId = selectedHouse.houseId }, src)
+    HousingRPC:Notify('bcc-housing:housePurchased', { houseCoords = coordsToPayload(selectedHouse.houseCoords) }, src)
 
     local displayAmount
     if currencyType == 0 then
@@ -190,12 +190,12 @@ local function handleHousePurchase(src, houseCoords, moneyTypeParam, cb)
         '\nHouse: ' .. selectedHouse.name .. ' was **' .. ownershipStatus .. '** for ' .. displayAmount ..
         '\nCharacter Name: ' .. tostring(character.firstname) .. ' ' .. tostring(character.lastname))
 
-    BccUtils.RPC:Notify('bcc-housing:ClientRecHouseLoad', {}, src)
+    HousingRPC:Notify('bcc-housing:ClientRecHouseLoad', {}, src)
 
     if cbFn then cbFn(true, { uniqueName = selectedHouse.uniqueName, ownershipStatus = ownershipStatus }) end
 end
 
-BccUtils.RPC:Register('bcc-housing:buyHouse', function(params, cb, src)
+HousingRPC:Register('bcc-housing:buyHouse', function(params, cb, src)
     handleHousePurchase(src, params and params.houseCoords, params and params.moneyType, cb)
 end)
 
@@ -278,7 +278,7 @@ function insertHouseDoors(doors, charidentifier, houseId, uniqueName)
     end
 end
 
-BccUtils.RPC:Register('bcc-housing:getPurchasedHouses', function(_, cb, src)
+HousingRPC:Register('bcc-housing:getPurchasedHouses', function(_, cb, src)
     local purchasedHouses = {}
     local results = DB.query('SELECT uniqueName FROM bcchousing')
     if results then

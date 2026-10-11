@@ -5,7 +5,7 @@ local function StartAgentPrompt()
     AgentPromptGroupObj = BccUtils.Prompts:SetupPromptGroup()
     AgentPrompt = AgentPromptGroupObj:RegisterPrompt(
         _U("collectFromDealer"),
-        BccUtils.Keys[Config.keys.collect],
+        HousingKeys[Config.keys.collect],
         1,
         1,
         true,
@@ -167,7 +167,7 @@ CreateThread(function()
                             Wait(500) -- ensures it is not triggered multiple times
 
                             if shopCfg.shop.jobsEnabled then
-                                local hasJob = BccUtils.RPC:CallAsync(
+                                local hasJob = HousingRPC:CallAsync(
                                     'bcc-housing:CheckJob',
                                     { location = shop }
                                 )
@@ -196,7 +196,7 @@ function OpenCollectMoneyMenu()
         return
     end
 
-    local soldHouses = BccUtils.RPC:CallAsync('bcc-housing:RequestSoldHouses')
+    local soldHouses = HousingRPC:CallAsync('bcc-housing:RequestSoldHouses')
     if soldHouses == false then return end
 
     local collectMoneyMenu = BCCHousingMenu:RegisterPage("bcc-housing:CollectMoneyPage")
@@ -241,7 +241,7 @@ function OpenCollectMoneyMenu()
         style = {},
         slot = "footer"
     }, function()
-        local success, response = BccUtils.RPC:CallAsync('bcc-housing:collectHouseSaleMoneyFromNpc', {})
+        local success, response = HousingRPC:CallAsync('bcc-housing:collectHouseSaleMoneyFromNpc', {})
         if not success then
             DBG:Error("Failed to collect house sale money: " .. tostring(response and response.error))
         end
@@ -273,7 +273,7 @@ function OpenCollectMoneyMenu()
 end
 
 function OpenIssuePropertyDocumentMenu()
-    local success, houses = BccUtils.RPC:CallAsync('bcc-housing:GetOwnedPropertyDocuments', {})
+    local success, houses = HousingRPC:CallAsync('bcc-housing:GetOwnedPropertyDocuments', {})
     if not success then
         DBG:Error("Failed to fetch owned property documents: " .. tostring(houses and houses.error))
         return
@@ -302,7 +302,7 @@ function OpenIssuePropertyDocumentMenu()
                 style = {},
                 slot = "content"
             }, function()
-                local issued, response = BccUtils.RPC:CallAsync('bcc-housing:IssuePropertyDocument', {
+                local issued, response = HousingRPC:CallAsync('bcc-housing:IssuePropertyDocument', {
                     houseId = house.houseId
                 })
                 if not issued then

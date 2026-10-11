@@ -247,7 +247,7 @@ local function handleCreationDBInsert(src, tpHouse, owner, radius, doors, houseC
         Wait(1500)
 
         if ownerSource ~= nil then
-            BccUtils.RPC:Notify('bcc-housing:ClientRecHouseLoad', {}, ownerSource)
+            HousingRPC:Notify('bcc-housing:ClientRecHouseLoad', {}, ownerSource)
         end
 
         pendingInventoryLimits[src] = nil
@@ -260,7 +260,7 @@ local function handleCreationDBInsert(src, tpHouse, owner, radius, doors, houseC
     end
 end
 
-BccUtils.RPC:Register('bcc-housing:CreationDBInsert', function(params, cb, src)
+HousingRPC:Register('bcc-housing:CreationDBInsert', function(params, cb, src)
     handleCreationDBInsert(
         src,
         params and params.tpHouse,
@@ -280,7 +280,7 @@ BccUtils.RPC:Register('bcc-housing:CreationDBInsert', function(params, cb, src)
     )
 end)
 
-BccUtils.RPC:Register('bcc-housing:SaveExistingHousePolyZone', function(params, cb, src)
+HousingRPC:Register('bcc-housing:SaveExistingHousePolyZone', function(params, cb, src)
     local houseId = tonumber(params and params.houseId)
     local polyPoints = params and params.polyPoints
     local polyMinZ = tonumber(params and params.polyMinZ)
@@ -349,7 +349,7 @@ local function handleSetInventoryLimit(src, invLimitParam, houseIdParam, cb)
     if cbFn then cbFn(true, { invLimit = invLimitValue, houseId = houseIdParam }) end
 end
 
-BccUtils.RPC:Register('bcc-housing:SetInventoryLimit', function(params, cb, src)
+HousingRPC:Register('bcc-housing:SetInventoryLimit', function(params, cb, src)
     if not IsHousingAdmin(src) then
         NotifyClient(src, _U('noAccessToHouse'), 4000, 'error')
         if cb then cb(false) end
@@ -401,7 +401,7 @@ local function refreshPlayerHouses(targetSource)
                 end
             end
 
-            BccUtils.RPC:Notify('bcc-housing:PrivatePropertyCheckHandler', {
+            HousingRPC:Notify('bcc-housing:PrivatePropertyCheckHandler', {
                 coords = decodedCoords,
                 radius = v.house_radius_limit,
                 houseid = v.houseid,
@@ -419,23 +419,23 @@ local function refreshPlayerHouses(targetSource)
                 table.insert(accessibleHouses, v.houseid)
                 
                 -- ✅ Notify player they own this house and show the ID
-                BccUtils.RPC:Notify('bcc-housing:OwnsHouseClientHandler', { house = v, isOwner = true }, targetSource)
-                BccUtils.RPC:Notify('bcc-housing:ShowMessage', { message = "You own house ID: " .. tostring(v.houseid) }, targetSource)
+                HousingRPC:Notify('bcc-housing:OwnsHouseClientHandler', { house = v, isOwner = true }, targetSource)
+                HousingRPC:Notify('bcc-housing:ShowMessage', { message = "You own house ID: " .. tostring(v.houseid) }, targetSource)
                 DBG:Info("Player " .. charIdentifierString .. " owns house ID: " .. tostring(v.houseid))
             else
                 if hasAccessToProperty then
                     table.insert(accessibleHouses, v.houseid)
-                    BccUtils.RPC:Notify('bcc-housing:OwnsHouseClientHandler', { house = v, isOwner = false }, targetSource)
+                    HousingRPC:Notify('bcc-housing:OwnsHouseClientHandler', { house = v, isOwner = false }, targetSource)
                 end
             end
         end
     end
 
-    BccUtils.RPC:Notify('bcc-housing:ReceiveAccessibleHouses', { houses = accessibleHouses }, targetSource)
+    HousingRPC:Notify('bcc-housing:ReceiveAccessibleHouses', { houses = accessibleHouses }, targetSource)
     return accessibleHouses
 end
 
-BccUtils.RPC:Register('bcc-housing:CheckIfHasHouse', function(params, cb, src)
+HousingRPC:Register('bcc-housing:CheckIfHasHouse', function(params, cb, src)
     local targetSource = params and params.targetSource
     if targetSource and GetPlayerName(targetSource) == nil then
         DBG:Info("CheckIfHasHouse RPC received invalid target source " .. tostring(targetSource))
@@ -460,7 +460,7 @@ end)
 
 
 -- Event to open the house inventory
-BccUtils.RPC:Register('bcc-house:OpenHouseInv', function(params, cb, src)
+HousingRPC:Register('bcc-house:OpenHouseInv', function(params, cb, src)
     local houseId = params and params.houseId
     if not houseId then
         if cb then cb(false, { error = _U('noHouseFound') }) end
@@ -525,7 +525,7 @@ BccUtils.RPC:Register('bcc-house:OpenHouseInv', function(params, cb, src)
     if cb then cb(false) end
 end)
 
-BccUtils.RPC:Register('bcc-house:AdminOpenHouseInv', function(params, cb, src)
+HousingRPC:Register('bcc-house:AdminOpenHouseInv', function(params, cb, src)
     local houseId = params and params.houseId
     if not houseId then
         if cb then cb(false, { error = _U('noHouseFound') }) end
@@ -552,7 +552,7 @@ BccUtils.RPC:Register('bcc-house:AdminOpenHouseInv', function(params, cb, src)
     if cb then cb(true) end
 end)
 
-BccUtils.RPC:Register('bcc-housing:GetInventoryStages', function(params, cb, src)
+HousingRPC:Register('bcc-housing:GetInventoryStages', function(params, cb, src)
     local houseId = params and params.houseId
     if not houseId then
         if cb then cb(false, { error = _U('noHouseFound') }) end
@@ -592,7 +592,7 @@ BccUtils.RPC:Register('bcc-housing:GetInventoryStages', function(params, cb, src
     end
 end)
 
-BccUtils.RPC:Register('bcc-housing:UpgradeInventory', function(params, cb, src)
+HousingRPC:Register('bcc-housing:UpgradeInventory', function(params, cb, src)
     local houseId = params and params.houseId
     if not houseId then
         if cb then cb(false, { error = _U('noHouseFound') }) end
@@ -680,7 +680,7 @@ function updateDoorAccess(doorId, newId)
     end
 end
 
-BccUtils.RPC:Register("bcc-housing:GetDoorsByHouseId", function(params, cb, recSource)
+HousingRPC:Register("bcc-housing:GetDoorsByHouseId", function(params, cb, recSource)
     local houseId = params and params.houseId
     if not houseId then
         cb(nil) -- Return nil to indicate an invalid house ID
@@ -716,7 +716,7 @@ BccUtils.RPC:Register("bcc-housing:GetDoorsByHouseId", function(params, cb, recS
     end
 end)
 
-BccUtils.RPC:Register("bcc-housing:GetAllowedIdsForHouse", function(params, cb, recSource)
+HousingRPC:Register("bcc-housing:GetAllowedIdsForHouse", function(params, cb, recSource)
     local houseId = params and params.houseId
 
     if not houseId then
@@ -741,7 +741,7 @@ BccUtils.RPC:Register("bcc-housing:GetAllowedIdsForHouse", function(params, cb, 
 end)
 
 -- Register the RPC for adding a door to a house
-BccUtils.RPC:Register("bcc-housing:AddDoorToHouse", function(params, cb, recSource)
+HousingRPC:Register("bcc-housing:AddDoorToHouse", function(params, cb, recSource)
     local houseId = params and params.houseId
     local newDoor = params and params.newDoor
 
@@ -780,7 +780,7 @@ BccUtils.RPC:Register("bcc-housing:AddDoorToHouse", function(params, cb, recSour
     end
 end)
 
-BccUtils.RPC:Register("bcc-housing:GiveAccessToDoor", function(params, cb, src)
+HousingRPC:Register("bcc-housing:GiveAccessToDoor", function(params, cb, src)
     local doorId = params and params.doorId
     local userId = params and params.userId
 
@@ -822,7 +822,7 @@ BccUtils.RPC:Register("bcc-housing:GiveAccessToDoor", function(params, cb, src)
     end
 end)
 
-BccUtils.RPC:Register("bcc-housing:RemoveAccessFromDoor", function(params, cb, recSource)
+HousingRPC:Register("bcc-housing:RemoveAccessFromDoor", function(params, cb, recSource)
     local doorId = params and params.doorId
     local userId = params and params.userId
 
@@ -867,7 +867,7 @@ BccUtils.RPC:Register("bcc-housing:RemoveAccessFromDoor", function(params, cb, r
     cb(false)
 end)
 
-BccUtils.RPC:Register("bcc-housing:DeleteDoor", function(params, cb, recSource)
+HousingRPC:Register("bcc-housing:DeleteDoor", function(params, cb, recSource)
     local doorId = params and params.doorId
 
     if not doorId then
@@ -1082,7 +1082,7 @@ local function handleLedgerHandling(src, amountParam, houseIdParam, isAdding, cb
     end
 end
 
-BccUtils.RPC:Register('bcc-housing:LedgerHandling', function(params, cb, src)
+HousingRPC:Register('bcc-housing:LedgerHandling', function(params, cb, src)
     handleLedgerHandling(
         src,
         params and params.amount,
@@ -1111,12 +1111,12 @@ local function handleCheckLedger(src, houseIdParam, cb)
     end
 end
 
-BccUtils.RPC:Register('bcc-housing:CheckLedger', function(params, cb, src)
+HousingRPC:Register('bcc-housing:CheckLedger', function(params, cb, src)
     handleCheckLedger(src, params and params.houseid, cb)
 end)
 
 
-BccUtils.RPC:Register('bcc-housing:getHouseId', function(params, cb, src)
+HousingRPC:Register('bcc-housing:getHouseId', function(params, cb, src)
     local context = params and params.context
     local houseId = params and params.houseId
 
@@ -1193,7 +1193,7 @@ BccUtils.RPC:Register('bcc-housing:getHouseId', function(params, cb, src)
     end
 end)
 
-BccUtils.RPC:Register('bcc-housing:getHouseOwner', function(params, cb, src)
+HousingRPC:Register('bcc-housing:getHouseOwner', function(params, cb, src)
     local houseId = params and params.houseId
     if not houseId then
         if cb then cb(false, { error = _U('noHouseFound') }) end
@@ -1239,7 +1239,7 @@ BccUtils.RPC:Register('bcc-housing:getHouseOwner', function(params, cb, src)
     end
 end)
 
-BccUtils.RPC:Register('bcc-housing:GetHouseContext', function(params, cb, src)
+HousingRPC:Register('bcc-housing:GetHouseContext', function(params, cb, src)
     local houseId = params and params.houseId
     if not houseId then
         if cb then cb(false, { error = _U('noHouseFound') }) end
@@ -1324,7 +1324,7 @@ BccUtils.RPC:Register('bcc-housing:GetHouseContext', function(params, cb, src)
     if cb then cb(true, context) end
 end)
 
-BccUtils.RPC:Register('bcc-housing:CheckIfHouseExists', function(params, cb, src)
+HousingRPC:Register('bcc-housing:CheckIfHouseExists', function(params, cb, src)
     local houseId = params and params.houseId
     if not houseId then
         if cb then cb(false, { exists = false, houseId = nil }) end

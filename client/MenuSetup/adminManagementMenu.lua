@@ -1,10 +1,10 @@
-BccUtils.RPC:Register('bcc-housing:AdminManagementMenu', function(params)
+HousingRPC:Register('bcc-housing:AdminManagementMenu', function(params)
     if params and params.houses then
         AdminManagementMenu(params.houses)
     end
 end)
 
-BccUtils.RPC:Register('bcc-housing:GetHouseInfo', function(params)
+HousingRPC:Register('bcc-housing:GetHouseInfo', function(params)
     if params then
         local houseInfo = params.houseInfo or params
         AdminManagementMenuHouseChose(houseInfo)
@@ -409,7 +409,7 @@ function AdminManagementMenuHouseChose(houseInfo)
             label = _U("releaseHouseTaxPayment"),
             style = {}
         }, function()
-            local success = BccUtils.RPC:CallAsync('bcc-house:AdminReleaseHouseTaxPayment', {
+            local success = HousingRPC:CallAsync('bcc-house:AdminReleaseHouseTaxPayment', {
                 houseId = houseInfo.houseid
             })
 
@@ -424,7 +424,7 @@ function AdminManagementMenuHouseChose(houseInfo)
         label = _U("openHouseInventory"),
         style = {}
     }, function()
-        local success, result = BccUtils.RPC:CallAsync('bcc-house:AdminOpenHouseInv', {
+        local success, result = HousingRPC:CallAsync('bcc-house:AdminOpenHouseInv', {
             houseId = houseInfo.houseid
         })
 
@@ -443,7 +443,7 @@ function AdminManagementMenuHouseChose(houseInfo)
         slot = "footer",
         style = { ['position'] = 'relative', ['z-index'] = 9 }
     }, function()
-        local success, houses = BccUtils.RPC:CallAsync('bcc-housing:AdminGetAllHouses', {})
+        local success, houses = HousingRPC:CallAsync('bcc-housing:AdminGetAllHouses', {})
         if success and houses then
             AdminManagementMenu(houses)
         else
@@ -504,7 +504,7 @@ function deleteHouse(houseInfo)
         slot = "footer",
         style = {}
     }, function()
-        local success, err = BccUtils.RPC:CallAsync('bcc-house:AdminManagementDelHouse', { houseId = houseInfo.houseid })
+        local success, err = HousingRPC:CallAsync('bcc-house:AdminManagementDelHouse', { houseId = houseInfo.houseid })
         if not success then
             DBG:Info("AdminManagementDelHouse RPC failed: " .. tostring(err and err.error))
         end
@@ -584,7 +584,7 @@ function changeHouseRadius(houseInfo)
         style = {},
     }, function()
         if radiusValue then
-            local success, err = BccUtils.RPC:CallAsync('bcc-house:AdminManagementChangeHouseRadius', {
+            local success, err = HousingRPC:CallAsync('bcc-house:AdminManagementChangeHouseRadius', {
                 houseId = houseInfo.houseid,
                 radius = radiusValue
             })
@@ -671,7 +671,7 @@ function changeHouseTaxes(houseInfo)
         style = {},
     }, function()
         if taxAmount then
-            local success, err = BccUtils.RPC:CallAsync('bcc-house:AdminManagementChangeTaxAmount', {
+            local success, err = HousingRPC:CallAsync('bcc-house:AdminManagementChangeTaxAmount', {
                 houseId = houseInfo.houseid,
                 tax = taxAmount
             })
@@ -757,7 +757,7 @@ function changeHouseInventory(houseInfo)
         style = {},
     }, function()
         if inventoryLimit then
-            local success, err = BccUtils.RPC:CallAsync('bcc-house:AdminManagementChangeInvLimit', {
+            local success, err = HousingRPC:CallAsync('bcc-house:AdminManagementChangeInvLimit', {
                 houseId = houseInfo.houseid,
                 invLimit = inventoryLimit
             })

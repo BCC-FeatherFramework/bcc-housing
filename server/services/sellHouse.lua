@@ -102,16 +102,16 @@ local function handleSellHouse(src, houseIdParam, cb)
             z = coords.z or 0.0
         }
 
-        BccUtils.RPC:Notify('bcc-housing:showCollectMoneyPrompt', { coords = coordsPayload, houseId = houseId, amount = sellPrice }, src)
-        BccUtils.RPC:Notify('bcc-housing:OwnsHouseClientHandler', { house = houseData, isOwner = false}, src)
-        BccUtils.RPC:Notify('bcc-housing:StopPropertyCheck', {}, src)
-        BccUtils.RPC:Notify('bcc-housing:clearBlips', { houseId = houseId }, src)
-        BccUtils.RPC:Notify('bcc-housing:ReinitializeChecksAfterSale', {}, src)
+        HousingRPC:Notify('bcc-housing:showCollectMoneyPrompt', { coords = coordsPayload, houseId = houseId, amount = sellPrice }, src)
+        HousingRPC:Notify('bcc-housing:OwnsHouseClientHandler', { house = houseData, isOwner = false}, src)
+        HousingRPC:Notify('bcc-housing:StopPropertyCheck', {}, src)
+        HousingRPC:Notify('bcc-housing:clearBlips', { houseId = houseId }, src)
+        HousingRPC:Notify('bcc-housing:ReinitializeChecksAfterSale', {}, src)
 
         if cbFn then cbFn(true, { amount = sellPrice }) end
 end
 
-BccUtils.RPC:Register('bcc-housing:sellHouse', function(params, cb, src)
+HousingRPC:Register('bcc-housing:sellHouse', function(params, cb, src)
     handleSellHouse(src, params and params.houseId, cb)
 end)
 
@@ -164,15 +164,15 @@ local function handleUnrentHouse(src, houseIdParam, cb)
         NotifyClient(src, _U('rentalEndedSuccess'), 4000, 'success')
         Discord:sendMessage('House rental ended by charIdentifier: ' .. tostring(charIdentifier) .. '\nHouse ID: ' .. tostring(houseId))
 
-        BccUtils.RPC:Notify('bcc-housing:StopPropertyCheck', {}, src)
-        BccUtils.RPC:Notify('bcc-housing:clearBlips', { houseId = houseId }, src)
-        BccUtils.RPC:Notify('bcc-housing:ReinitializeChecksAfterSale', {}, src)
-        BccUtils.RPC:Notify('bcc-housing:ClientRecHouseLoad', {}, src)
+        HousingRPC:Notify('bcc-housing:StopPropertyCheck', {}, src)
+        HousingRPC:Notify('bcc-housing:clearBlips', { houseId = houseId }, src)
+        HousingRPC:Notify('bcc-housing:ReinitializeChecksAfterSale', {}, src)
+        HousingRPC:Notify('bcc-housing:ClientRecHouseLoad', {}, src)
 
         if cbFn then cbFn(true, { houseId = houseId }) end
 end
 
-BccUtils.RPC:Register('bcc-housing:unrentHouse', function(params, cb, src)
+HousingRPC:Register('bcc-housing:unrentHouse', function(params, cb, src)
     handleUnrentHouse(src, params and params.houseId, cb)
 end)
 
@@ -271,8 +271,8 @@ local function handleSellHouseToPlayerWithInventory(src, houseIdParam, targetPla
         NotifyClient(src, _U('houseSoldSuccess', salePrice), 4000, 'success')
         NotifyClient(targetPlayerId, _U('housePurchasedSuccess', salePrice), 4000, 'success')
 
-        BccUtils.RPC:Notify('bcc-housing:ClientRecHouseLoad', {}, targetPlayerId)
-        BccUtils.RPC:Notify('bcc-housing:ClientRecHouseLoad', {}, src)
+        HousingRPC:Notify('bcc-housing:ClientRecHouseLoad', {}, targetPlayerId)
+        HousingRPC:Notify('bcc-housing:ClientRecHouseLoad', {}, src)
 
         Discord:sendMessage('House ID: ' ..
             tostring(houseId) ..
@@ -283,7 +283,7 @@ local function handleSellHouseToPlayerWithInventory(src, houseIdParam, targetPla
         if cbFn then cbFn(true, { amount = salePrice }) end
 end
 
-BccUtils.RPC:Register('bcc-housing:sellHouseToPlayerWithInventory', function(params, cb, src)
+HousingRPC:Register('bcc-housing:sellHouseToPlayerWithInventory', function(params, cb, src)
     handleSellHouseToPlayerWithInventory(
         src,
         params and params.houseId,
@@ -388,8 +388,8 @@ local function handleSellHouseToPlayerWithoutInventory(src, houseIdParam, target
         NotifyClient(src, _U('houseSoldWithoutInventory', salePrice), 4000, 'success')
         NotifyClient(targetPlayerId, _U('housePurchasedWithoutInventory', salePrice), 4000, 'success')
 
-        BccUtils.RPC:Notify('bcc-housing:ClientRecHouseLoad', {}, targetPlayerId)
-        BccUtils.RPC:Notify('bcc-housing:ClientRecHouseLoad', {}, src)
+        HousingRPC:Notify('bcc-housing:ClientRecHouseLoad', {}, targetPlayerId)
+        HousingRPC:Notify('bcc-housing:ClientRecHouseLoad', {}, src)
 
         Discord:sendMessage('House ID: ' ..
             tostring(houseId) ..
@@ -400,7 +400,7 @@ local function handleSellHouseToPlayerWithoutInventory(src, houseIdParam, target
         if cbFn then cbFn(true, { amount = salePrice }) end
 end
 
-BccUtils.RPC:Register('bcc-housing:sellHouseToPlayerWithoutInventory', function(params, cb, src)
+HousingRPC:Register('bcc-housing:sellHouseToPlayerWithoutInventory', function(params, cb, src)
     handleSellHouseToPlayerWithoutInventory(
         src,
         params and params.houseId,
@@ -410,7 +410,7 @@ BccUtils.RPC:Register('bcc-housing:sellHouseToPlayerWithoutInventory', function(
     )
 end)
 
-BccUtils.RPC:Register('bcc-housing:RequestSoldHouses', function(params, cb, src)
+HousingRPC:Register('bcc-housing:RequestSoldHouses', function(params, cb, src)
     local user = VORPcore.getUser(src)
     if not user then return cb(false) end
 
@@ -472,6 +472,6 @@ local function handleCollectHouseSaleMoney(src, cb)
     end
 end
 
-BccUtils.RPC:Register('bcc-housing:collectHouseSaleMoneyFromNpc', function(_, cb, src)
+HousingRPC:Register('bcc-housing:collectHouseSaleMoneyFromNpc', function(_, cb, src)
     handleCollectHouseSaleMoney(src, cb)
 end)

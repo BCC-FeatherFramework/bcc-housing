@@ -15,7 +15,7 @@ local function setPlayerBucket(src, bucketId)
     return bucketId
 end
 
-BccUtils.RPC:Register('bcc-housing:SetInstance', function(params, cb, src)
+HousingRPC:Register('bcc-housing:SetInstance', function(params, cb, src)
     DBG:Info('Registered bcc-housing:SetInstance RPC')
     if not src then
         if cb then cb(false, { error = 'invalid_source' }) end
@@ -35,7 +35,7 @@ BccUtils.RPC:Register('bcc-housing:SetInstance', function(params, cb, src)
     if cb then cb(true, { bucketId = bucketId }) end
 end)
 
-BccUtils.RPC:Register('bcc-housing:LeaveInstance', function(_, cb, src)
+HousingRPC:Register('bcc-housing:LeaveInstance', function(_, cb, src)
     if not src then
         if cb then cb(false, { error = 'invalid_source' }) end
         return
@@ -45,7 +45,7 @@ BccUtils.RPC:Register('bcc-housing:LeaveInstance', function(_, cb, src)
     if cb then cb(true) end
 end)
 
-BccUtils.RPC:Register('bcc-housing:GetInstance', function(_, cb, src)
+HousingRPC:Register('bcc-housing:GetInstance', function(_, cb, src)
     local bucketId = playerBuckets[src] or 0
     if cb then cb(true, { bucketId = bucketId }) end
 end)

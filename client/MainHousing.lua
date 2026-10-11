@@ -41,7 +41,7 @@ function GetHouseContext(houseId)
 end
 
 local function checkIfAdmin()
-    local isAdmin = BccUtils.RPC:CallAsync('bcc-housing:CheckIfAdmin')
+    local isAdmin = HousingRPC:CallAsync('bcc-housing:CheckIfAdmin')
     AdminAllowed = isAdmin == true
     return AdminAllowed
 end
@@ -91,7 +91,7 @@ if Config.OpenHousingMenuCommand and Config.OpenHousingMenuCommand ~= '' then
             return
         end
 
-        local successOwner, ownerData = BccUtils.RPC:CallAsync('bcc-housing:getHouseOwner', { houseId = HouseId })
+        local successOwner, ownerData = HousingRPC:CallAsync('bcc-housing:getHouseOwner', { houseId = HouseId })
         if successOwner and ownerData then
             if ownerData.taxesOverdue then
                 Notify(_U("taxesOverdue"), 'error', 5000)
@@ -114,7 +114,7 @@ AddEventHandler('onClientResourceStart', function(resourceName)
 
     CreateThread(function()
         Wait(1000) -- wait for other scripts/player state to finish initializing after restart
-        BccUtils.RPC:CallAsync('bcc-housing:CheckIfHasHouse', {})
+        HousingRPC:CallAsync('bcc-housing:CheckIfHasHouse', {})
     end)
 end)
 
@@ -130,15 +130,15 @@ function ManageHotelBlips()
 end
 
 RegisterNetEvent('vorp:SelectedCharacter', function()
-    BccUtils.RPC:Notify('bcc-housing:getPlayersInfo', {})
+    HousingRPC:Notify('bcc-housing:getPlayersInfo', {})
     checkIfAdmin()
-    local success, hotels = BccUtils.RPC:CallAsync('bcc-housing:HotelDbRegistry', {})
+    local success, hotels = HousingRPC:CallAsync('bcc-housing:HotelDbRegistry', {})
     if success and type(hotels) == 'table' then
         OwnedHotels = hotels
     else
         OwnedHotels = {}
     end
-    BccUtils.RPC:CallAsync('bcc-housing:CheckIfHasHouse', {})
+    HousingRPC:CallAsync('bcc-housing:CheckIfHasHouse', {})
     ManageHotelBlips()
     if not HotelHandlerStarted then
         HotelHandlerStarted = true
@@ -149,15 +149,15 @@ end)
 CreateThread(function() -- Devmode area
     if Config.DevMode then
         --RegisterCommand(Config.DevModeCommand, function()
-            BccUtils.RPC:Notify('bcc-housing:getPlayersInfo', {})
+            HousingRPC:Notify('bcc-housing:getPlayersInfo', {})
             checkIfAdmin()
-            local success, hotels = BccUtils.RPC:CallAsync('bcc-housing:HotelDbRegistry', {})
+            local success, hotels = HousingRPC:CallAsync('bcc-housing:HotelDbRegistry', {})
             if success and type(hotels) == 'table' then
                 OwnedHotels = hotels
             else
                 OwnedHotels = {}
             end
-            BccUtils.RPC:CallAsync('bcc-housing:CheckIfHasHouse', {})
+            HousingRPC:CallAsync('bcc-housing:CheckIfHasHouse', {})
             ManageHotelBlips()
             if not HotelHandlerStarted then
                 HotelHandlerStarted = true
@@ -247,7 +247,7 @@ local function handleOwnsHouseClient(houseTable, owner)
     showManageOpt(vectorCoords.x, vectorCoords.y, vectorCoords.z, houseId, houseContext)
 end
 
-BccUtils.RPC:Register('bcc-housing:OwnsHouseClientHandler', function(params)
+HousingRPC:Register('bcc-housing:OwnsHouseClientHandler', function(params)
     if not params then return end
     if params.house then
         handleOwnsHouseClient(params.house, params.isOwner)
@@ -260,16 +260,16 @@ function MainHotelHandler()
     DBG:Info("Initializing main hotel handler")
 
     local buyGroup = BccUtils.Prompts:SetupPromptGroup()
-    local buyPrompt = buyGroup:RegisterPrompt(_U("promptBuy"), BccUtils.Keys[Config.keys.buy], 1, 1, true, 'click', nil)
+    local buyPrompt = buyGroup:RegisterPrompt(_U("promptBuy"), HousingKeys[Config.keys.buy], 1, 1, true, 'click', nil)
 
     local enterGroup = BccUtils.Prompts:SetupPromptGroup()
-    local enterPrompt = enterGroup:RegisterPrompt(_U("promptEnterHotel"), BccUtils.Keys[Config.keys.manage], 1, 1, true, 'click', nil)
+    local enterPrompt = enterGroup:RegisterPrompt(_U("promptEnterHotel"), HousingKeys[Config.keys.manage], 1, 1, true, 'click', nil)
 
     local inventoryGroup = BccUtils.Prompts:SetupPromptGroup()
-    local inventoryPrompt = inventoryGroup:RegisterPrompt(_U("hotelInvName"), BccUtils.Keys[Config.keys.manage], 1, 1, true, 'click', nil)
+    local inventoryPrompt = inventoryGroup:RegisterPrompt(_U("hotelInvName"), HousingKeys[Config.keys.manage], 1, 1, true, 'click', nil)
 
     local leaveGroup = BccUtils.Prompts:SetupPromptGroup()
-    local leavePrompt = leaveGroup:RegisterPrompt(_U("promptLeaveHotel"), BccUtils.Keys[Config.keys.manage], 1, 1, true, 'click', nil)
+    local leavePrompt = leaveGroup:RegisterPrompt(_U("promptLeaveHotel"), HousingKeys[Config.keys.manage], 1, 1, true, 'click', nil)
 
     local inHotel, hotelInside, instanceNumber, coordsWhenEntered = false, nil, 0, nil
     local interiorEnterCoords, interiorInventoryCoords, interiorHeading = nil, nil, nil
@@ -292,7 +292,7 @@ function MainHotelHandler()
                                 isOwned = true
                                 enterGroup:ShowGroup(hotel.name)
                                 if enterPrompt:HasCompleted() then
-                                    BccUtils.RPC:CallAsync('bcc-housing:RegisterHotelInventory', { hotelId = hotelId })
+                                    HousingRPC:CallAsync('bcc-housing:RegisterHotelInventory', { hotelId = hotelId })
                                     local player = PlayerId()
                                     DBG:Info("Entering hotel: " .. tostring(hotelId))
                                     inHotel = true
@@ -320,7 +320,7 @@ function MainHotelHandler()
                         buyGroup:ShowGroup(hotel.name .. _U("promptGroupName") .. tostring(hotel.cost))
                         if buyPrompt:HasCompleted() then
                             DBG:Info("Buying hotel: " .. tostring(hotel.hotelId))
-                            local success, updatedHotels = BccUtils.RPC:CallAsync('bcc-housing:HotelBought', { hotel = hotel })
+                            local success, updatedHotels = HousingRPC:CallAsync('bcc-housing:HotelBought', { hotel = hotel })
                             if success and type(updatedHotels) == 'table' then
                                 OwnedHotels = updatedHotels
                             end
@@ -337,7 +337,7 @@ function MainHotelHandler()
                 inventoryGroup:ShowGroup(hotelInside.name)
                 if inventoryPrompt:HasCompleted() then
                     DBG:Info("Opening hotel inventory: " .. tostring(hotelInside.hotelId))
-                    BccUtils.RPC:CallAsync('bcc-housing:HotelInvOpen', { hotelId = hotelInside.hotelId })
+                    HousingRPC:CallAsync('bcc-housing:HotelInvOpen', { hotelId = hotelInside.hotelId })
                 end
             else
                 leaveGroup:ShowGroup(hotelInside.name)
@@ -374,7 +374,7 @@ local function clearHouseBlips(houseId)
     end
 end
 
-BccUtils.RPC:Register('bcc-housing:clearBlips', function(params)
+HousingRPC:Register('bcc-housing:clearBlips', function(params)
     local houseId = params and params.houseId or params
     if houseId then
         clearHouseBlips(houseId)

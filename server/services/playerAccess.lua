@@ -1,4 +1,4 @@
-BccUtils.RPC:Register("bcc-housing:GetPlayersWithAccess", function(params, cb, recSource)
+HousingRPC:Register("bcc-housing:GetPlayersWithAccess", function(params, cb, recSource)
     local houseId = params and params.houseId
     if not houseId then
         cb({})
@@ -43,7 +43,7 @@ BccUtils.RPC:Register("bcc-housing:GetPlayersWithAccess", function(params, cb, r
     end
 end)
 
-BccUtils.RPC:Register('bcc-housing:NewPlayerGivenAccess', function(params, cb, src)
+HousingRPC:Register('bcc-housing:NewPlayerGivenAccess', function(params, cb, src)
     local id = params and params.charIdentifier
     local houseid = params and params.houseId
     local recSource = params and params.recSource
@@ -128,7 +128,7 @@ BccUtils.RPC:Register('bcc-housing:NewPlayerGivenAccess', function(params, cb, s
         if affectedRows > 0 then
             DBG:Info("Access list updated successfully for houseid: " .. tostring(houseid))
             if recSource and GetPlayerName(recSource) then
-                BccUtils.RPC:Notify('bcc-housing:ClientRecHouseLoad', {}, recSource)
+                HousingRPC:Notify('bcc-housing:ClientRecHouseLoad', {}, recSource)
             end
         else
             DBG:Info("Update failed for houseid: " .. tostring(houseid))
@@ -158,7 +158,7 @@ BccUtils.RPC:Register('bcc-housing:NewPlayerGivenAccess', function(params, cb, s
     if cb then cb(true) end
 end)
 
-BccUtils.RPC:Register('bcc-housing:RemovePlayerAccess', function(params, cb, src)
+HousingRPC:Register('bcc-housing:RemovePlayerAccess', function(params, cb, src)
     local houseId = params and params.houseId
     local playerId = params and params.playerId
     if not houseId or not playerId then
@@ -210,7 +210,7 @@ BccUtils.RPC:Register('bcc-housing:RemovePlayerAccess', function(params, cb, src
 
     if affectedRows and affectedRows > 0 then
         DBG:Info("Removed player access successfully for Player ID: " .. tostring(playerId))
-        BccUtils.RPC:Notify('bcc-housing:ClientRecHouseLoad', {}, src)
+        HousingRPC:Notify('bcc-housing:ClientRecHouseLoad', {}, src)
         NotifyClient(src, _U("removeAccessTo") .. tostring(playerId), 4000, "success")
         if cb then cb(true) end
     else

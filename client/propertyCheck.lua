@@ -240,7 +240,7 @@ CreateThread(function()
                                 if distance <= spawnRadius then
                                     if data.spawnState ~= "spawned" and data.spawnState ~= "pending_spawn" then
                                         data.spawnState = "pending_spawn"
-                                        local ok = BccUtils.RPC:CallAsync("bcc-housing:FurniturePlacedCheck", {
+                                        local ok = HousingRPC:CallAsync("bcc-housing:FurniturePlacedCheck", {
                                             houseid = data.houseid,
                                             deletion = false,
                                             close = true
@@ -249,7 +249,7 @@ CreateThread(function()
                                     end
                                 elseif distance > clearRadius and data.spawnState == "spawned" then
                                     data.spawnState = "pending_clear"
-                                    local ok = BccUtils.RPC:CallAsync("bcc-housing:FurniturePlacedCheck", {
+                                    local ok = HousingRPC:CallAsync("bcc-housing:FurniturePlacedCheck", {
                                         houseid = data.houseid,
                                         deletion = true
                                     })
@@ -337,11 +337,11 @@ local function stopPrivatePropertyCheck()
     DBG:Info("Property check has been stopped and all registered properties cleared.")
 end
 
-BccUtils.RPC:Register('bcc-housing:PrivatePropertyCheckHandler', function(params)
+HousingRPC:Register('bcc-housing:PrivatePropertyCheckHandler', function(params)
     if not params or not params.coords then return end
     startPrivatePropertyCheck(params.coords, params.radius, params.houseid, params.polyPoints, params.polyMinZ, params.polyMaxZ, params.hasAccess)
 end)
 
-BccUtils.RPC:Register('bcc-housing:StopPropertyCheck', function()
+HousingRPC:Register('bcc-housing:StopPropertyCheck', function()
     stopPrivatePropertyCheck()
 end)

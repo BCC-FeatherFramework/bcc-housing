@@ -20,7 +20,7 @@ function ClearSpawnedFurniture()
     DBG:Info("[ClearSpawnedFurniture] Finished clearing furniture list")
 end
 
-BccUtils.RPC:Register("bcc-housing:ClearFurnitureEvent", function(params, cb)
+HousingRPC:Register("bcc-housing:ClearFurnitureEvent", function(params, cb)
     local hid = params and params.houseid
     DBG:Info(("[ClearFurnitureEvent] RPC received%s, clearing furniture") :format(hid and (" for houseId " .. tostring(hid)) or ""))
 
@@ -58,7 +58,7 @@ AddEventHandler("onClientResourceStop", function(resource)
     ClearSpawnedFurniture()
 end)
 
-BccUtils.RPC:Register("bcc-housing:SpawnFurnitureEvent", function(params)
+HousingRPC:Register("bcc-housing:SpawnFurnitureEvent", function(params)
     if not params or not params.furniture then
         DBG:Info("SpawnFurnitureEvent RPC received without furniture data")
         return
@@ -159,7 +159,7 @@ function StartFurnCheckHandler()
                                 spawnDespawnDistance, tostring(id))
                             )
 
-                            local ok = BccUtils.RPC:CallAsync("bcc-housing:FurniturePlacedCheck", {
+                            local ok = HousingRPC:CallAsync("bcc-housing:FurniturePlacedCheck", {
                                 houseid = id,
                                 deletion = false,
                                 close = true
@@ -179,7 +179,7 @@ function StartFurnCheckHandler()
                             )
 
                             ClearSpawnedFurniture()
-                            local ok = BccUtils.RPC:CallAsync("bcc-housing:FurniturePlacedCheck", {
+                            local ok = HousingRPC:CallAsync("bcc-housing:FurniturePlacedCheck", {
                                 houseid = id,
                                 deletion = true
                             })

@@ -155,7 +155,7 @@ end
 
 function HousingInstance.Set(bucketId)
     bucketId = tonumber(bucketId) or 0
-    local success, response = BccUtils.RPC:CallAsync('bcc-housing:SetInstance', { bucketId = bucketId })
+    local success, response = HousingRPC:CallAsync('bcc-housing:SetInstance', { bucketId = bucketId })
     if not success then
         DBG:Error("Failed to set instance: " .. tostring(response and response.error))
     end
@@ -163,7 +163,7 @@ function HousingInstance.Set(bucketId)
 end
 
 function HousingInstance.Clear()
-    local success, response = BccUtils.RPC:CallAsync('bcc-housing:LeaveInstance', {})
+    local success, response = HousingRPC:CallAsync('bcc-housing:LeaveInstance', {})
     if not success then
         -- Use the local debug instance to avoid nil access when the RPC fails
         DBG:Error("Failed to clear instance: " .. tostring(response and response.error))
@@ -284,7 +284,7 @@ function Notify(message, typeOrDuration, maybeDuration, overrides)
     end
 end
 
-BccUtils.RPC:Register("bcc-housing:NotifyClient", function(data)
+HousingRPC:Register("bcc-housing:NotifyClient", function(data)
     if not data or not data.message then return end
 
     local notifyType = data.type
@@ -315,7 +315,7 @@ end
 
 -------- Get Players Function --------
 function GetPlayers()
-    local success, playersData = BccUtils.RPC:CallAsync("bcc-housing:GetPlayers", {})
+    local success, playersData = HousingRPC:CallAsync("bcc-housing:GetPlayers", {})
     if success and type(playersData) == "table" then
         return playersData
     end
@@ -326,7 +326,7 @@ function GetPlayersWithAccess(houseId, callback)
     DBG:Info("Requesting players with access for House ID: " .. tostring(houseId))
 
     -- Use RPC to call the server-side function and handle the response
-    BccUtils.RPC:Call("bcc-housing:GetPlayersWithAccess", { houseId = houseId }, function(result)
+    HousingRPC:Call("bcc-housing:GetPlayersWithAccess", { houseId = houseId }, function(result)
         if result and #result > 0 then
             DBG:Info("Number of players with access received: " .. tostring(#result))
             for _, player in ipairs(result) do
@@ -346,7 +346,7 @@ function showManageOpt(x, y, z, houseId, houseContext)
     RemoveManagePrompt(houseId)
 
     local promptGroup = BccUtils.Prompts:SetupPromptGroup()
-    local promptHandle = promptGroup:RegisterPrompt(_U("openOwnerManage"), BccUtils.Keys[Config.keys.manage], 1, 1, true, 'click', nil)
+    local promptHandle = promptGroup:RegisterPrompt(_U("openOwnerManage"), HousingKeys[Config.keys.manage], 1, 1, true, 'click', nil)
     local radiusValue = 2.0
     ManageHousePrompts[houseId] = {
         prompt = promptHandle,
@@ -360,7 +360,7 @@ function showManageOpt(x, y, z, houseId, houseContext)
     DBG:Info("Setting up manage options for House ID: " .. tostring(houseId) .. " at coordinates: " .. tostring(x) .. ", " .. tostring(y) .. ", " .. tostring(z))
 
     local houseExists = false
-    local success, data = BccUtils.RPC:CallAsync('bcc-housing:CheckIfHouseExists', { houseId = houseId })
+    local success, data = HousingRPC:CallAsync('bcc-housing:CheckIfHouseExists', { houseId = houseId })
     if success and data then
         houseExists = data.exists
     end
@@ -410,7 +410,7 @@ function showManageOpt(x, y, z, houseId, houseContext)
                             SetActiveHouseContext(ctx)
                         end
 
-                        local successOwner, ownerData = BccUtils.RPC:CallAsync('bcc-housing:getHouseOwner', { houseId = houseId })
+                        local successOwner, ownerData = HousingRPC:CallAsync('bcc-housing:getHouseOwner', { houseId = houseId })
                         if successOwner and ownerData then
                             if ownerData.taxesOverdue then
                                 local now = GetGameTimer()
@@ -514,12 +514,12 @@ AddEventHandler("onClientResourceStop", function(resource)
         RemoveManagePrompt()
         ClearSpawnedFurniture()
         BCCHousingMenu:Close()
-        BccUtils.RPC:CallAsync('bcc-housing:ServerSideRssStop', {})
+        HousingRPC:CallAsync('bcc-housing:ServerSideRssStop', {})
     end
 end)
 
 -- Receive House Owner Information
-BccUtils.RPC:Register('bcc-housing:receiveHouseOwner', function(params)
+HousingRPC:Register('bcc-housing:receiveHouseOwner', function(params)
     if not params then return end
     DBG:Info("Received house owner information via RPC for House ID: " .. tostring(params.houseId))
     OpenHousingMainMenu(params.houseId, params.isOwner, params.ownershipStatus, params.taxPaymentReleased)

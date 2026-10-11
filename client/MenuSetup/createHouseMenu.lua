@@ -24,7 +24,7 @@ local function ensurePolyState()
 end
 
 local function canUseHousingPolyCommand()
-    local allowed = BccUtils.RPC:CallAsync('bcc-housing:CheckIfAdmin')
+    local allowed = HousingRPC:CallAsync('bcc-housing:CheckIfAdmin')
     return allowed == true
 end
 
@@ -211,7 +211,7 @@ end
 local function getHousingPolyKeyCode(keyName, fallback)
     if not keyName or keyName == '' then return fallback end
     keyName = keyName:upper()
-    return (BccUtils.Keys and BccUtils.Keys[keyName]) or fallback
+    return (BccUtils.Keys and HousingKeys[keyName]) or fallback
 end
 
 local function deleteHousingPolyPrompts()
@@ -318,7 +318,7 @@ local function saveHousingPolyCapture()
     end
 
     if housingPolyCapture.saveMode == 'existing' and housingPolyCapture.targetHouseId then
-        local success, response = BccUtils.RPC:CallAsync('bcc-housing:SaveExistingHousePolyZone', {
+        local success, response = HousingRPC:CallAsync('bcc-housing:SaveExistingHousePolyZone', {
             houseId = housingPolyCapture.targetHouseId,
             polyPoints = globalHouseData.polyPoints,
             polyMinZ = globalHouseData.polyMinZ,
@@ -329,7 +329,7 @@ local function saveHousingPolyCapture()
             return
         end
         Notify(('Polyzone saved for house ID %s'):format(tostring(housingPolyCapture.targetHouseId)), 'success', 5000)
-        BccUtils.RPC:CallAsync('bcc-housing:CheckIfHasHouse', {})
+        HousingRPC:CallAsync('bcc-housing:CheckIfHasHouse', {})
         stopHousingPolyCapture(true)
         return
     end
@@ -720,7 +720,7 @@ function HouseManagementMenu(allHouses)
         label = _U('manageAllHouses'),
         style = { ['position'] = 'relative', ['z-index'] = 9 }
     }, function()
-        local success, houses = BccUtils.RPC:CallAsync('bcc-housing:AdminGetAllHouses', {})
+        local success, houses = HousingRPC:CallAsync('bcc-housing:AdminGetAllHouses', {})
         if success and houses then
             AdminManagementMenu(houses) -- directly open the admin management menu
         else
@@ -1159,7 +1159,7 @@ function setInvLimit(houseId)
         style = {},
     }, function()
         if globalHouseData.invLimit then
-            local success, err = BccUtils.RPC:CallAsync('bcc-housing:SetInventoryLimit', {
+            local success, err = HousingRPC:CallAsync('bcc-housing:SetInventoryLimit', {
                 invLimit = globalHouseData.invLimit,
                 houseId = houseId
             })
@@ -1216,7 +1216,7 @@ function confirmCreation(globalHouseData)
         tpHouse = tpInt
     end
     -- Assuming data contains all necessary information
-    local success, err = BccUtils.RPC:CallAsync('bcc-housing:CreationDBInsert', {
+    local success, err = HousingRPC:CallAsync('bcc-housing:CreationDBInsert', {
         tpHouse = tpHouse,
         owner = globalHouseData.owner,
         radius = globalHouseData.radius,
@@ -1237,6 +1237,6 @@ function confirmCreation(globalHouseData)
     DBG:Info("Sending data to server:", tpHouse, globalHouseData.owner, globalHouseData.radius, globalHouseData.doors, globalHouseData.houseCoords, globalHouseData.invLimit, globalHouseData.ownerSource, globalHouseData.taxAmount)
 end
 
-BccUtils.RPC:Register('bcc-housing:ClientRecHouseLoad', function()
-    BccUtils.RPC:CallAsync('bcc-housing:CheckIfHasHouse', {})
+HousingRPC:Register('bcc-housing:ClientRecHouseLoad', function()
+    HousingRPC:CallAsync('bcc-housing:CheckIfHasHouse', {})
 end)

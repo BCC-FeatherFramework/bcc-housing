@@ -129,7 +129,7 @@ local function ensureHousePreviewPrompt()
     housePreviewPromptGroup = BccUtils.Prompt:SetupPromptGroup()
     housePreviewClosePrompt = housePreviewPromptGroup:RegisterPrompt(
         _U("closePropertyPreview"),
-        BccUtils.Keys[Config.keys.cancel],
+        HousingKeys[Config.keys.cancel],
         1, 1, true, 'click', nil
     )
 end
@@ -252,7 +252,7 @@ end)
 
 CreateThread(function()
     -- Request the purchased houses list from the server when the resource starts
-    local success, houses = BccUtils.RPC:CallAsync('bcc-housing:getPurchasedHouses', {})
+    local success, houses = HousingRPC:CallAsync('bcc-housing:getPurchasedHouses', {})
     if success and type(houses) == 'table' then
         PurchasedHouses = {}
         for _, coords in ipairs(houses) do
@@ -270,7 +270,7 @@ CreateThread(function()
     local PromptGroup = BccUtils.Prompt:SetupPromptGroup()
     local BuyHousePrompt = PromptGroup:RegisterPrompt(
         _U("moreInfo"),
-        BccUtils.Keys[Config.keys.buy],
+        HousingKeys[Config.keys.buy],
         1, 1, true, 'click', nil
     )
 
@@ -324,7 +324,7 @@ CreateThread(function()
 end)
 
 
-BccUtils.RPC:Register('bcc-housing:housePurchased', function(params)
+HousingRPC:Register('bcc-housing:housePurchased', function(params)
     if not params then return end
     local coords = params.houseCoords or params
     if type(coords) == "table" and coords.x and coords.y and coords.z then
@@ -333,8 +333,8 @@ BccUtils.RPC:Register('bcc-housing:housePurchased', function(params)
     end
 end)
 
-BccUtils.RPC:Register('bcc-housing:ReinitializeChecksAfterSale', function()
-    local success, houses = BccUtils.RPC:CallAsync('bcc-housing:getPurchasedHouses', {})
+HousingRPC:Register('bcc-housing:ReinitializeChecksAfterSale', function()
+    local success, houses = HousingRPC:CallAsync('bcc-housing:getPurchasedHouses', {})
     if success and type(houses) == "table" then
         PurchasedHouses = {}
         for _, coords in ipairs(houses) do
@@ -371,7 +371,7 @@ function OpenBuyHouseMenu(house)
     local invLimit     = tonumber(house.invLimit or 0) or 0
     local taxAmount    = tonumber(house.taxAmount or 0) or 0
     local houseName    = house.name or "House"
-    local isAdmin      = BccUtils.RPC:CallAsync('bcc-housing:CheckIfAdmin') == true
+    local isAdmin      = HousingRPC:CallAsync('bcc-housing:CheckIfAdmin') == true
 
     local buyHouseMenu = BCCHousingMenu:RegisterPage("bcc-housing:BuyHousePage")
     local currencyWord = getCurrencyWord(rentalCurrency)
@@ -477,7 +477,7 @@ function OpenBuyHouseMenu(house)
     }, function()
         stopHouseAreaPreview()
         BCCHousingMenu:Close()
-        local success, err = BccUtils.RPC:CallAsync('bcc-housing:buyHouse', {
+        local success, err = HousingRPC:CallAsync('bcc-housing:buyHouse', {
             houseCoords = house.houseCoords,
             moneyType = 0 -- Cash
         })
@@ -494,7 +494,7 @@ function OpenBuyHouseMenu(house)
         }, function()
             stopHouseAreaPreview()
             BCCHousingMenu:Close()
-            local success, err = BccUtils.RPC:CallAsync('bcc-housing:buyHouse', {
+            local success, err = HousingRPC:CallAsync('bcc-housing:buyHouse', {
                 houseCoords = house.houseCoords,
                 moneyType = 1 -- Rental
             })

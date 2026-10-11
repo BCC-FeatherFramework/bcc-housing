@@ -89,7 +89,7 @@ CreateThread(function()
     end
 
     local vendorPromptGroup = BccUtils.Prompts:SetupPromptGroup()
-    local vendorPrompt = vendorPromptGroup:RegisterPrompt(_U('furnitureVendorPrompt'), BccUtils.Keys[Config.keys.buy],
+    local vendorPrompt = vendorPromptGroup:RegisterPrompt(_U('furnitureVendorPrompt'), HousingKeys[Config.keys.buy],
         1, 1, true, 'click', nil)
 
     for _, vendor in ipairs(furnitureVendors) do

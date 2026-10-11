@@ -137,7 +137,7 @@ end
 
 local function RequestHouseContext(houseId)
     if not houseId then return nil end
-    local success, ctx = BccUtils.RPC:CallAsync('bcc-housing:GetHouseContext', { houseId = houseId })
+    local success, ctx = HousingRPC:CallAsync('bcc-housing:GetHouseContext', { houseId = houseId })
     if success and ctx then
         return CacheHouseContext(ctx)
     end
@@ -377,7 +377,7 @@ function FurnitureMenu(houseId, ownershipStatus, ownedFurniture)
     end
     local houseFurnitureCount = 0
     if ownershipStatus == 'purchased' then
-        local countSuccess, countResult = BccUtils.RPC:CallAsync("bcc-housing:GetHouseFurnitureCount", { houseId = houseId })
+        local countSuccess, countResult = HousingRPC:CallAsync("bcc-housing:GetHouseFurnitureCount", { houseId = houseId })
         if countSuccess then
             houseFurnitureCount = tonumber(countResult) or 0
         else
@@ -453,7 +453,7 @@ function FurnitureMenu(houseId, ownershipStatus, ownedFurniture)
         slot = "footer",
         style = {}
     }, function()
-        local success, furniture, ownershipStatus = BccUtils.RPC:CallAsync("bcc-housing:GetOwnerFurniture",
+        local success, furniture, ownershipStatus = HousingRPC:CallAsync("bcc-housing:GetOwnerFurniture",
             { houseId = houseId })
         if success then
             SellOwnedFurnitureMenu(houseId, furniture or {}, ownershipStatus)
@@ -617,7 +617,7 @@ function OpenFurnitureVendorItemMenu(categoryIndex, itemIndex)
         slot = 'footer',
         style = {}
     }, function()
-        local success = BccUtils.RPC:CallAsync("bcc-housing:PurchaseFurnitureItem", {
+        local success = HousingRPC:CallAsync("bcc-housing:PurchaseFurnitureItem", {
             categoryIndex = categoryIndex,
             itemIndex = itemIndex
         })
@@ -713,7 +713,7 @@ function FurnitureVendorMenu()
         label = _U("getFurnitureBook"),
         style = {}
     }, function()
-        local success, message = BccUtils.RPC:CallAsync("bcc-housing:GiveFurnitureBook", {})
+        local success, message = HousingRPC:CallAsync("bcc-housing:GiveFurnitureBook", {})
         if success then
             Notify(message or _U("furnitureBookReceived"), "success", 4000)
         else
@@ -883,7 +883,7 @@ local function EditPlacedFurniture(entity, houseId, entryIndex, entryData)
                 local finalCoords = GetEntityCoords(entity)
                 local finalRot = GetEntityRotation(entity, 2)
 
-                local ok = BccUtils.RPC:CallAsync("bcc-housing:UpdatePlacedFurniture", {
+                local ok = HousingRPC:CallAsync("bcc-housing:UpdatePlacedFurniture", {
                     houseId = houseId,
                     index = entryIndex,
                     coords = { x = finalCoords.x, y = finalCoords.y, z = finalCoords.z },
@@ -935,7 +935,7 @@ function StartEditNearestFurniture()
         return
     end
 
-    local ownerOk, ownerData = BccUtils.RPC:CallAsync('bcc-housing:getHouseOwner', { houseId = HouseId })
+    local ownerOk, ownerData = HousingRPC:CallAsync('bcc-housing:getHouseOwner', { houseId = HouseId })
     if not ownerOk or not ownerData or ownerData.isOwner ~= true then
         Notify(_U("editFurnitureNotOwner"), "error", 4000)
         return
@@ -948,7 +948,7 @@ function StartEditNearestFurniture()
         return
     end
 
-    local listOk, furnList = BccUtils.RPC:CallAsync("bcc-housing:GetPlacedFurnitureList", { houseId = HouseId })
+    local listOk, furnList = HousingRPC:CallAsync("bcc-housing:GetPlacedFurnitureList", { houseId = HouseId })
     if not listOk or type(furnList) ~= "table" then
         Notify(_U("editFurnitureLoadFailed"), "error", 4000)
         return
@@ -978,13 +978,13 @@ function StartEditNearestFurniture()
     EditPlacedFurniture(nearestEntity, HouseId, closestIndex, closestEntry)
 end
 
-BccUtils.RPC:Register('bcc-housing:OpenFurnitureBook', function(params)
+HousingRPC:Register('bcc-housing:OpenFurnitureBook', function(params)
     local ownedFurniture = params and params.ownedFurniture or {}
     OwnedFurnitureCache = ownedFurniture
     FurnitureMenu(HouseId, HouseOwnershipStatus, OwnedFurnitureCache)
 end)
 
-BccUtils.RPC:Register("bcc-housing:OwnedFurnitureSync", function(params)
+HousingRPC:Register("bcc-housing:OwnedFurnitureSync", function(params)
     OwnedFurnitureCache = params.ownedItems or {}
     if FurnitureMenuOpen then
         FurnitureMenu(HouseId, HouseOwnershipStatus, OwnedFurnitureCache)
@@ -1013,112 +1013,112 @@ end, false)
 -- Create all prompts for furniture placement using PromptsAPI
 function StartFurniturePlacementPrompts()
     MoveForwardPrompt = UiPromptRegisterBegin()
-    UiPromptSetControlAction(MoveForwardPrompt, BccUtils.Keys['R'])
+    UiPromptSetControlAction(MoveForwardPrompt, HousingKeys['R'])
     UiPromptSetText(MoveForwardPrompt, CreateVarString(10, 'LITERAL_STRING', _U("forward")))
     UiPromptSetStandardMode(MoveForwardPrompt, true)
     UiPromptSetGroup(MoveForwardPrompt, FurnitureGroup, 0)
     UiPromptRegisterEnd(MoveForwardPrompt)
 
     MoveBackwardPrompt = UiPromptRegisterBegin()
-    UiPromptSetControlAction(MoveBackwardPrompt, BccUtils.Keys['E'])
+    UiPromptSetControlAction(MoveBackwardPrompt, HousingKeys['E'])
     UiPromptSetText(MoveBackwardPrompt, CreateVarString(10, 'LITERAL_STRING', _U("backward")))
     UiPromptSetStandardMode(MoveBackwardPrompt, true)
     UiPromptSetGroup(MoveBackwardPrompt, FurnitureGroup, 0)
     UiPromptRegisterEnd(MoveBackwardPrompt)
 
     MoveLeftPrompt = UiPromptRegisterBegin()
-    UiPromptSetControlAction(MoveLeftPrompt, BccUtils.Keys['LEFT'])
+    UiPromptSetControlAction(MoveLeftPrompt, HousingKeys['LEFT'])
     UiPromptSetText(MoveLeftPrompt, CreateVarString(10, 'LITERAL_STRING', _U("left")))
     UiPromptSetStandardMode(MoveLeftPrompt, true)
     UiPromptSetGroup(MoveLeftPrompt, FurnitureGroup, 0)
     UiPromptRegisterEnd(MoveLeftPrompt)
 
     MoveRightPrompt = UiPromptRegisterBegin()
-    UiPromptSetControlAction(MoveRightPrompt, BccUtils.Keys['RIGHT'])
+    UiPromptSetControlAction(MoveRightPrompt, HousingKeys['RIGHT'])
     UiPromptSetText(MoveRightPrompt, CreateVarString(10, 'LITERAL_STRING', _U("right")))
     UiPromptSetStandardMode(MoveRightPrompt, true)
     UiPromptSetGroup(MoveRightPrompt, FurnitureGroup, 0)
     UiPromptRegisterEnd(MoveRightPrompt)
 
     MoveUpPrompt = UiPromptRegisterBegin()
-    UiPromptSetControlAction(MoveUpPrompt, BccUtils.Keys['UP'])
+    UiPromptSetControlAction(MoveUpPrompt, HousingKeys['UP'])
     UiPromptSetText(MoveUpPrompt, CreateVarString(10, 'LITERAL_STRING', _U("up")))
     UiPromptSetStandardMode(MoveUpPrompt, true)
     UiPromptSetGroup(MoveUpPrompt, FurnitureGroup, 0)
     UiPromptRegisterEnd(MoveUpPrompt)
 
     MoveDownPrompt = UiPromptRegisterBegin()
-    UiPromptSetControlAction(MoveDownPrompt, BccUtils.Keys['DOWN'])
+    UiPromptSetControlAction(MoveDownPrompt, HousingKeys['DOWN'])
     UiPromptSetText(MoveDownPrompt, CreateVarString(10, 'LITERAL_STRING', _U("down")))
     UiPromptSetStandardMode(MoveDownPrompt, true)
     UiPromptSetGroup(MoveDownPrompt, FurnitureGroup, 0)
     UiPromptRegisterEnd(MoveDownPrompt)
 
     RotateYawPrompt = UiPromptRegisterBegin()
-    UiPromptSetControlAction(RotateYawPrompt, BccUtils.Keys['UP'])
+    UiPromptSetControlAction(RotateYawPrompt, HousingKeys['UP'])
     UiPromptSetText(RotateYawPrompt, CreateVarString(10, 'LITERAL_STRING', _U("rotateYaw")))
     UiPromptSetStandardMode(RotateYawPrompt, true)
     UiPromptSetGroup(RotateYawPrompt, FurnitureGroup, 1)
     UiPromptRegisterEnd(RotateYawPrompt)
 
     RotateYawLeftPrompt = UiPromptRegisterBegin()
-    UiPromptSetControlAction(RotateYawLeftPrompt, BccUtils.Keys['DOWN'])
+    UiPromptSetControlAction(RotateYawLeftPrompt, HousingKeys['DOWN'])
     UiPromptSetText(RotateYawLeftPrompt, CreateVarString(10, 'LITERAL_STRING', _U("rotateYawLeft")))
     UiPromptSetStandardMode(RotateYawLeftPrompt, true)
     UiPromptSetGroup(RotateYawLeftPrompt, FurnitureGroup, 1)
     UiPromptRegisterEnd(RotateYawLeftPrompt)
 
     RotatePitchPrompt = UiPromptRegisterBegin()
-    UiPromptSetControlAction(RotatePitchPrompt, BccUtils.Keys['E'])
+    UiPromptSetControlAction(RotatePitchPrompt, HousingKeys['E'])
     UiPromptSetText(RotatePitchPrompt, CreateVarString(10, 'LITERAL_STRING', _U("rotatepitch")))
     UiPromptSetStandardMode(RotatePitchPrompt, true)
     UiPromptSetGroup(RotatePitchPrompt, FurnitureGroup, 1)
     UiPromptRegisterEnd(RotatePitchPrompt)
 
     RotateBackwardPrompt = UiPromptRegisterBegin()
-    UiPromptSetControlAction(RotateBackwardPrompt, BccUtils.Keys['R'])
+    UiPromptSetControlAction(RotateBackwardPrompt, HousingKeys['R'])
     UiPromptSetText(RotateBackwardPrompt, CreateVarString(10, 'LITERAL_STRING', _U("rotatebackward")))
     UiPromptSetStandardMode(RotateBackwardPrompt, true)
     UiPromptSetGroup(RotateBackwardPrompt, FurnitureGroup, 1)
     UiPromptRegisterEnd(RotateBackwardPrompt)
 
     RotateRightPrompt = UiPromptRegisterBegin()
-    UiPromptSetControlAction(RotateRightPrompt, BccUtils.Keys['RIGHT'])
+    UiPromptSetControlAction(RotateRightPrompt, HousingKeys['RIGHT'])
     UiPromptSetText(RotateRightPrompt, CreateVarString(10, 'LITERAL_STRING', _U("rotateright")))
     UiPromptSetStandardMode(RotateRightPrompt, true)
     UiPromptSetGroup(RotateRightPrompt, FurnitureGroup, 1)
     UiPromptRegisterEnd(RotateRightPrompt)
 
     RotateLeftPrompt = UiPromptRegisterBegin()
-    UiPromptSetControlAction(RotateLeftPrompt, BccUtils.Keys['LEFT'])
+    UiPromptSetControlAction(RotateLeftPrompt, HousingKeys['LEFT'])
     UiPromptSetText(RotateLeftPrompt, CreateVarString(10, 'LITERAL_STRING', _U("rotateleft")))
     UiPromptSetStandardMode(RotateLeftPrompt, true)
     UiPromptSetGroup(RotateLeftPrompt, FurnitureGroup, 1)
     UiPromptRegisterEnd(RotateLeftPrompt)
 
     IncreasePrecisionPrompt = UiPromptRegisterBegin()
-    UiPromptSetControlAction(IncreasePrecisionPrompt, BccUtils.Keys['UP'])
+    UiPromptSetControlAction(IncreasePrecisionPrompt, HousingKeys['UP'])
     UiPromptSetText(IncreasePrecisionPrompt, CreateVarString(10, 'LITERAL_STRING', _U("increasePrecision")))
     UiPromptSetStandardMode(IncreasePrecisionPrompt, true)
     UiPromptSetGroup(IncreasePrecisionPrompt, FurnitureGroup, 2)
     UiPromptRegisterEnd(IncreasePrecisionPrompt)
 
     DecreasePrecisionPrompt = UiPromptRegisterBegin()
-    UiPromptSetControlAction(DecreasePrecisionPrompt, BccUtils.Keys['DOWN'])
+    UiPromptSetControlAction(DecreasePrecisionPrompt, HousingKeys['DOWN'])
     UiPromptSetText(DecreasePrecisionPrompt, CreateVarString(10, 'LITERAL_STRING', _U("decreasePrecision")))
     UiPromptSetStandardMode(DecreasePrecisionPrompt, true)
     UiPromptSetGroup(DecreasePrecisionPrompt, FurnitureGroup, 2)
     UiPromptRegisterEnd(DecreasePrecisionPrompt)
 
     ConfirmPrompt = UiPromptRegisterBegin()
-    UiPromptSetControlAction(ConfirmPrompt, BccUtils.Keys['SPACEBAR'])
+    UiPromptSetControlAction(ConfirmPrompt, HousingKeys['SPACEBAR'])
     UiPromptSetText(ConfirmPrompt, CreateVarString(10, 'LITERAL_STRING', _U("confirmPlacement")))
     UiPromptSetStandardMode(ConfirmPrompt, true)
     UiPromptSetGroup(ConfirmPrompt, FurnitureGroup, 3)
     UiPromptRegisterEnd(ConfirmPrompt)
 
     CancelPrompt = UiPromptRegisterBegin()
-    UiPromptSetControlAction(CancelPrompt, BccUtils.Keys['BACKSPACE'])
+    UiPromptSetControlAction(CancelPrompt, HousingKeys['BACKSPACE'])
     UiPromptSetText(CancelPrompt, CreateVarString(10, 'LITERAL_STRING', _U("cancelPlacement")))
     UiPromptSetStandardMode(CancelPrompt, true)
     UiPromptSetGroup(CancelPrompt, FurnitureGroup, 3)
@@ -1439,7 +1439,7 @@ function ConfirmFurniturePlacement(obj, placementContext)
     FreezeEntityPosition(obj, true)
 
     -- RPC instead of TriggerServerEvent
-    local success = BccUtils.RPC:CallAsync("bcc-housing:PlaceOwnedFurniture", {
+    local success = HousingRPC:CallAsync("bcc-housing:PlaceOwnedFurniture", {
         ownedId = placementContext.ownedId,
         houseId = placementHouseId,
         placementData = {
@@ -1507,7 +1507,7 @@ end
 -- Helper function to handle the sale of furniture (implement as needed)
 function SellFurniture(furniture)
     DBG:Info("Selling furniture: " .. tostring(furniture.model))
-    BccUtils.RPC:CallAsync('bcc-housing:SellFurniture', { furniture = furniture })
+    HousingRPC:CallAsync('bcc-housing:SellFurniture', { furniture = furniture })
 end
 
 function SellOwnedFurnitureMenu(houseId, furnTable, ownershipStatus)
@@ -1542,7 +1542,7 @@ function SellOwnedFurnitureMenu(houseId, furnTable, ownershipStatus)
                     )
                     if dist < 1.0 then
                         attempted = true
-                        local ok = BccUtils.RPC:CallAsync('bcc-housing:FurnSoldRemoveFromTable', {
+                        local ok = HousingRPC:CallAsync('bcc-housing:FurnSoldRemoveFromTable', {
                             furnTable = v,
                             houseId = houseId,
                             wholeFurnTable = furnTable,
@@ -1608,14 +1608,14 @@ end
 
 function GetOwnedFurniture(houseId)
     DBG:Info("Requesting furniture for house ID: " .. tostring(houseId))
-    local success, furniture, ownershipStatus = BccUtils.RPC:CallAsync("bcc-housing:GetOwnerFurniture",
+    local success, furniture, ownershipStatus = HousingRPC:CallAsync("bcc-housing:GetOwnerFurniture",
         { houseId = houseId })
     if success then
         SellOwnedFurnitureMenu(houseId, furniture or {}, ownershipStatus)
     end
 end
 
-BccUtils.RPC:Register("bcc-housing:SellOwnedFurnMenu", function(params)
+HousingRPC:Register("bcc-housing:SellOwnedFurnMenu", function(params)
     if not params then return end
     local houseId = params.houseId
     local furnTable = params.furniture

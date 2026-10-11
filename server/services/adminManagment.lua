@@ -56,10 +56,10 @@ local function collectAdminHouseData()
 end
 
 local function pushAdminHouseData(src, houses)
-    BccUtils.RPC:Notify('bcc-housing:AdminManagementMenu', { houses = houses }, src)
+    HousingRPC:Notify('bcc-housing:AdminManagementMenu', { houses = houses }, src)
 end
 
-BccUtils.RPC:Register('bcc-housing:AdminGetAllHouses', function(_, cb, src)
+HousingRPC:Register('bcc-housing:AdminGetAllHouses', function(_, cb, src)
     if not IsHousingAdmin(src) then
         NotifyClient(src, _U('noAccessToHouse'), 4000, 'error')
         if cb then cb(false) end
@@ -72,7 +72,7 @@ BccUtils.RPC:Register('bcc-housing:AdminGetAllHouses', function(_, cb, src)
     if cb then cb(true, houses) end
 end)
 
-BccUtils.RPC:Register('bcc-house:AdminManagementDelHouse', function(params, cb, src)
+HousingRPC:Register('bcc-house:AdminManagementDelHouse', function(params, cb, src)
     if not IsHousingAdmin(src) then
         NotifyClient(src, _U('noAccessToHouse'), 4000, 'error')
         if cb then cb(false) end
@@ -95,7 +95,7 @@ BccUtils.RPC:Register('bcc-house:AdminManagementDelHouse', function(params, cb, 
     end
 end)
 
-BccUtils.RPC:Register('bcc-house:AdminManagementChangeHouseRadius', function(params, cb, src)
+HousingRPC:Register('bcc-house:AdminManagementChangeHouseRadius', function(params, cb, src)
     if not IsHousingAdmin(src) then
         NotifyClient(src, _U('noAccessToHouse'), 4000, 'error')
         if cb then cb(false) end
@@ -119,7 +119,7 @@ BccUtils.RPC:Register('bcc-house:AdminManagementChangeHouseRadius', function(par
     end
 end)
 
-BccUtils.RPC:Register('bcc-house:AdminManagementChangeInvLimit', function(params, cb, src)
+HousingRPC:Register('bcc-house:AdminManagementChangeInvLimit', function(params, cb, src)
     if not IsHousingAdmin(src) then
         NotifyClient(src, _U('noAccessToHouse'), 4000, 'error')
         if cb then cb(false) end
@@ -143,7 +143,7 @@ BccUtils.RPC:Register('bcc-house:AdminManagementChangeInvLimit', function(params
     end
 end)
 
-BccUtils.RPC:Register('bcc-house:AdminManagementChangeTaxAmount', function(params, cb, src)
+HousingRPC:Register('bcc-house:AdminManagementChangeTaxAmount', function(params, cb, src)
     if not IsHousingAdmin(src) then
         NotifyClient(src, _U('noAccessToHouse'), 4000, 'error')
         if cb then cb(false) end
@@ -167,7 +167,7 @@ BccUtils.RPC:Register('bcc-house:AdminManagementChangeTaxAmount', function(param
     end
 end)
 
-BccUtils.RPC:Register('bcc-house:AdminReleaseHouseTaxPayment', function(params, cb, src)
+HousingRPC:Register('bcc-house:AdminReleaseHouseTaxPayment', function(params, cb, src)
     if not IsHousingAdmin(src) then
         NotifyClient(src, _U('noAccessToHouse'), 4000, 'error')
         if cb then cb(false) end

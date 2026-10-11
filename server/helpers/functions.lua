@@ -64,7 +64,7 @@ end
 local PlayersTable = {}
 
 -- Event to handle player data retrieval
-BccUtils.RPC:Register('bcc-housing:GetPlayers', function(params, cb, src)
+HousingRPC:Register('bcc-housing:GetPlayers', function(params, cb, src)
     local data = {}
     local players = GetPlayers() -- Fetch all current players on the server
 
@@ -93,7 +93,7 @@ BccUtils.RPC:Register('bcc-housing:GetPlayers', function(params, cb, src)
 end)
 
 -- Event to update PlayersTable with player information for availability checks
-BccUtils.RPC:Register("bcc-housing:getPlayersInfo", function(params, cb, src)
+HousingRPC:Register("bcc-housing:getPlayersInfo", function(params, cb, src)
     if not table.contains(PlayersTable, src) then
         table.insert(PlayersTable, src) -- Prevent duplicate entries
     end
@@ -134,7 +134,7 @@ function NotifyClient(src, message, durationOrType, maybeDuration)
     end
 
     if Config.Notify == "feather-menu" then
-        BccUtils.RPC:Notify("bcc-housing:NotifyClient", {
+        HousingRPC:Notify("bcc-housing:NotifyClient", {
             message = message,
             type = notifyType,
             duration = duration
@@ -146,7 +146,7 @@ function NotifyClient(src, message, durationOrType, maybeDuration)
     end
 end
 
-BccUtils.RPC:Register('bcc-housing:ServerSideRssStop', function(_, cb, src)
+HousingRPC:Register('bcc-housing:ServerSideRssStop', function(_, cb, src)
     if src then
         DelSpawnedFurn(src)
     end

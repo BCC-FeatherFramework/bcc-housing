@@ -31,7 +31,7 @@ local function ownsHotel(charId, hotelId)
     return false
 end
 
-BccUtils.RPC:Register('bcc-housing:HotelDbRegistry', function(params, cb, src)
+HousingRPC:Register('bcc-housing:HotelDbRegistry', function(params, cb, src)
     local user = VORPcore.getUser(src)
     if not user then if cb then cb(false) end return end
 
@@ -60,7 +60,7 @@ BccUtils.RPC:Register('bcc-housing:HotelDbRegistry', function(params, cb, src)
     if cb then cb(true, ownedHotelsTable) end
 end)
 
-BccUtils.RPC:Register('bcc-housing:HotelBought', function(params, cb, src)
+HousingRPC:Register('bcc-housing:HotelBought', function(params, cb, src)
     local requestedHotel = params and params.hotel
     local hotelTable = findHotelConfig(requestedHotel and requestedHotel.hotelId)
     local user = VORPcore.getUser(src)
@@ -103,7 +103,7 @@ BccUtils.RPC:Register('bcc-housing:HotelBought', function(params, cb, src)
     if cb then cb(true, ownedHotelsTable) end
 end)
 
-BccUtils.RPC:Register('bcc-housing:RegisterHotelInventory', function(params, cb, src)
+HousingRPC:Register('bcc-housing:RegisterHotelInventory', function(params, cb, src)
     local hotelId = params and params.hotelId
     local user = VORPcore.getUser(src)
     if not user then if cb then cb(false) end return end
@@ -142,7 +142,7 @@ BccUtils.RPC:Register('bcc-housing:RegisterHotelInventory', function(params, cb,
     if cb then cb(true) end
 end)
 
-BccUtils.RPC:Register('bcc-housing:HotelInvOpen', function(params, cb, src)
+HousingRPC:Register('bcc-housing:HotelInvOpen', function(params, cb, src)
     local hotelId = params and params.hotelId
     local user = VORPcore.getUser(src)
     if not user then if cb then cb(false) end return end

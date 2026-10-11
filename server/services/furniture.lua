@@ -57,7 +57,7 @@ local function markHouseSpawnState(source, houseid, state)
     end
 end
 
-BccUtils.RPC:Register("bcc-housing:FurniturePlacedCheck", function(params, cb, src)
+HousingRPC:Register("bcc-housing:FurniturePlacedCheck", function(params, cb, src)
     local houseid  = params and params.houseid
     local deletion = params and params.deletion
     local close    = params and params.close
@@ -71,7 +71,7 @@ BccUtils.RPC:Register("bcc-housing:FurniturePlacedCheck", function(params, cb, s
     if deletion then
         if spawnedFurnitureByPlayer[src] and spawnedFurnitureByPlayer[src][houseid] then
             markHouseSpawnState(src, houseid, false)
-            BccUtils.RPC:Notify("bcc-housing:ClearFurnitureEvent", { houseid = houseid }, src)
+            HousingRPC:Notify("bcc-housing:ClearFurnitureEvent", { houseid = houseid }, src)
         end
         return cb(true)
     end
@@ -111,7 +111,7 @@ BccUtils.RPC:Register("bcc-housing:FurniturePlacedCheck", function(params, cb, s
     tostring(#decodedFurniture) .. " furniture entries to player " .. tostring(src) .. " for house " .. tostring(houseid))
 
     -- Push the payload to the specific client via RPC Notify
-    BccUtils.RPC:Notify("bcc-housing:SpawnFurnitureEvent", {
+    HousingRPC:Notify("bcc-housing:SpawnFurnitureEvent", {
         furniture = decodedFurniture,
         houseid = houseid
     }, src)
@@ -128,7 +128,7 @@ function DelSpawnedFurn(source, houseid)
         markHouseSpawnState(source, houseid, false)
         if notifyClient then
             -- Tell the specific client to clear props for this house
-            BccUtils.RPC:Notify("bcc-housing:ClearFurnitureEvent", { houseid = houseid }, source)
+            HousingRPC:Notify("bcc-housing:ClearFurnitureEvent", { houseid = houseid }, source)
         end
         return
     end
@@ -140,11 +140,11 @@ function DelSpawnedFurn(source, houseid)
         markHouseSpawnState(source, trackedHouseId, false)
     end
     if notifyClient and hadEntries then
-        BccUtils.RPC:Notify("bcc-housing:ClearFurnitureEvent", {}, source)
+        HousingRPC:Notify("bcc-housing:ClearFurnitureEvent", {}, source)
     end
 end
 
-BccUtils.RPC:Register("bcc-housing:GetHouseFurnitureCount", function(params, cb, src)
+HousingRPC:Register("bcc-housing:GetHouseFurnitureCount", function(params, cb, src)
     local houseId = params and params.houseId
     if not houseId then
         DBG:Info("GetHouseFurnitureCount called without houseId from src " .. tostring(src))
@@ -172,7 +172,7 @@ BccUtils.RPC:Register("bcc-housing:GetHouseFurnitureCount", function(params, cb,
     return cb(true, #furnitureTable)
 end)
 
-BccUtils.RPC:Register("bcc-housing:GetOwnerFurniture", function(params, cb, src)
+HousingRPC:Register("bcc-housing:GetOwnerFurniture", function(params, cb, src)
     local houseId = params and params.houseId
     DBG:Info("Getting owner furniture for house ID: " .. tostring(houseId))
     if not houseId then
@@ -220,7 +220,7 @@ BccUtils.RPC:Register("bcc-housing:GetOwnerFurniture", function(params, cb, src)
     return cb(true, furniture, houseData.ownershipStatus)
 end)
 
-BccUtils.RPC:Register("bcc-housing:GetPlacedFurnitureList", function(params, cb, src)
+HousingRPC:Register("bcc-housing:GetPlacedFurnitureList", function(params, cb, src)
     local houseId = params and params.houseId
     if not houseId then
         return cb(false, "invalidHouseId")
@@ -254,7 +254,7 @@ BccUtils.RPC:Register("bcc-housing:GetPlacedFurnitureList", function(params, cb,
     return cb(true, furniture)
 end)
 
-BccUtils.RPC:Register("bcc-housing:UpdatePlacedFurniture", function(params, cb, src)
+HousingRPC:Register("bcc-housing:UpdatePlacedFurniture", function(params, cb, src)
     local houseId = params and params.houseId
     local entryIndex = params and tonumber(params.index)
     local coords = params and params.coords
@@ -318,7 +318,7 @@ BccUtils.RPC:Register("bcc-housing:UpdatePlacedFurniture", function(params, cb, 
     cb(true)
 end)
 
-BccUtils.RPC:Register('bcc-housing:FurnSoldRemoveFromTable', function(params, cb, src)
+HousingRPC:Register('bcc-housing:FurnSoldRemoveFromTable', function(params, cb, src)
     local houseId = tonumber(params and params.houseId)
     local furnitureIndex = tonumber(params and params.wholeFurnTableKey)
     local character = GetHousingCharacter(src)
@@ -374,7 +374,7 @@ BccUtils.RPC:Register('bcc-housing:FurnSoldRemoveFromTable', function(params, cb
         _U("furnWebHookSoldModel") ..
         tostring(soldFurniture.model) .. _U("furnWebHookSoldPrice") .. tostring(sellPrice))
 
-    BccUtils.RPC:Notify("bcc-housing:SellOwnedFurnMenu", {
+    HousingRPC:Notify("bcc-housing:SellOwnedFurnMenu", {
         houseId = houseId,
         furniture = furniture,
         ownershipStatus = houseData.ownershipStatus
@@ -430,14 +430,14 @@ CreateThread(function()
             if not character then return end
 
             local ownedItems = loadOwnedFurniture(character.charIdentifier)
-            BccUtils.RPC:Notify("bcc-housing:OpenFurnitureBook", { ownedFurniture = ownedItems }, src)
+            HousingRPC:Notify("bcc-housing:OpenFurnitureBook", { ownedFurniture = ownedItems }, src)
             exports.vorp_inventory:closeInventory(src)
         end,
         GetCurrentResourceName()
     )
 end)
 
-BccUtils.RPC:Register("bcc-housing:GiveFurnitureBook", function(_, cb, src)
+HousingRPC:Register("bcc-housing:GiveFurnitureBook", function(_, cb, src)
     if not Furniture.MenuItem or Furniture.MenuItem == '' then
         DBG:Info("bcc-housing: Furniture.MenuItem not configured, cannot give book.")
         return cb(false, _U("furnitureBookUnavailable"))
@@ -463,7 +463,7 @@ BccUtils.RPC:Register("bcc-housing:GiveFurnitureBook", function(_, cb, src)
     cb(true, _U("furnitureBookReceived"))
 end)
 
-BccUtils.RPC:Register("bcc-housing:RequestOwnedFurniture", function(params, cb, src)
+HousingRPC:Register("bcc-housing:RequestOwnedFurniture", function(params, cb, src)
     local character = getCharacter(src)
     if not character then
         DBG:Info("bcc-housing: invalid character for src " .. tostring(src))
@@ -471,11 +471,11 @@ BccUtils.RPC:Register("bcc-housing:RequestOwnedFurniture", function(params, cb, 
     end
 
     local ownedItems = loadOwnedFurniture(character.charIdentifier)
-    BccUtils.RPC:Notify("bcc-housing:OwnedFurnitureSync", { ownedItems = ownedItems }, src)
+    HousingRPC:Notify("bcc-housing:OwnedFurnitureSync", { ownedItems = ownedItems }, src)
     cb(true)
 end)
 
-BccUtils.RPC:Register("bcc-housing:PurchaseFurnitureItem", function(params, cb, src)
+HousingRPC:Register("bcc-housing:PurchaseFurnitureItem", function(params, cb, src)
     local categoryIndex = tonumber(params.categoryIndex)
     local itemIndex = tonumber(params.itemIndex)
 
@@ -526,7 +526,7 @@ BccUtils.RPC:Register("bcc-housing:PurchaseFurnitureItem", function(params, cb, 
     table.insert(ownedItems, entry)
     saveOwnedFurniture(character.charIdentifier, ownedItems)
 
-    BccUtils.RPC:Notify("bcc-housing:OwnedFurnitureSync", { ownedItems = ownedItems }, src)
+    HousingRPC:Notify("bcc-housing:OwnedFurnitureSync", { ownedItems = ownedItems }, src)
     -- Discord logging
     Discord:sendMessage(
         _U("furnWebHookBought")
@@ -540,7 +540,7 @@ BccUtils.RPC:Register("bcc-housing:PurchaseFurnitureItem", function(params, cb, 
     cb(true)
 end)
 
-BccUtils.RPC:Register("bcc-housing:PlaceOwnedFurniture", function(params, cb, src)
+HousingRPC:Register("bcc-housing:PlaceOwnedFurniture", function(params, cb, src)
     local ownedId       = params and params.ownedId
     local houseId       = params and params.houseId
     local placementData = params and params.placementData
@@ -602,7 +602,7 @@ BccUtils.RPC:Register("bcc-housing:PlaceOwnedFurniture", function(params, cb, sr
 
     InsertFurnitureIntoDB(placementData, houseId)
 
-    BccUtils.RPC:Notify("bcc-housing:OwnedFurnitureSync", { ownedItems = ownedItems }, src)
+    HousingRPC:Notify("bcc-housing:OwnedFurnitureSync", { ownedItems = ownedItems }, src)
 
     Discord:sendMessage(
         _U("furnWebHookPlaced")
@@ -614,7 +614,7 @@ BccUtils.RPC:Register("bcc-housing:PlaceOwnedFurniture", function(params, cb, sr
     cb(true)
 end)
 
-BccUtils.RPC:Register('bcc-housing:SellFurniture', function(params, cb, src)
+HousingRPC:Register('bcc-housing:SellFurniture', function(params, cb, src)
     DBG:Info("SellFurniture RPC invoked but not implemented; returning failure.")
     NotifyClient(src, _U('furnNotSold'), 4000, 'error')
     if cb then cb(false) end
