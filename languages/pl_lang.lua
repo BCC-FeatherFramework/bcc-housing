@@ -442,4 +442,5 @@ Feather.Locale.register("pl", {
     doorSaveFailed = "Failed to save door.",
     doorRemoveFailed = "Failed to remove door.",
     switchTab = "Zmień zakładkę",
+    houseCreateFailed = "Nie udało się utworzyć domu.",
 })

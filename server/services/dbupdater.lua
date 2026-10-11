@@ -28,7 +28,9 @@ local function getDefaultPurchasedAtFromTaxDay()
 end
 
 CreateThread(function()
-    -- Create the bcchousing table if it doesn't exist
+    DB.awaitReady()
+    -- Create the bcchousing table if it doesn't exist. Character columns hold Feather
+    -- character UUIDs; charidentifier caches the holder, feather-property is the truth.
     DB.exec([[
         CREATE TABLE IF NOT EXISTS `bcchousing` (
             `charidentifier` varchar(50) NOT NULL,
@@ -59,6 +61,8 @@ CreateThread(function()
     DB.exec("ALTER TABLE `bcchousing` ADD COLUMN IF NOT EXISTS `poly_max_z` DOUBLE NULL")
     DB.exec("ALTER TABLE `bcchousing` ADD COLUMN IF NOT EXISTS `property_deed` LONGTEXT NULL")
     DB.exec("ALTER TABLE `bcchousing` ADD COLUMN IF NOT EXISTS `purchased_at` DATETIME NULL DEFAULT NULL")
+    -- The house's feather-property property (see server/feather/property.lua).
+    DB.exec("ALTER TABLE `bcchousing` ADD COLUMN IF NOT EXISTS `property_id` CHAR(36) NULL DEFAULT NULL")
     local lastTaxProcessedColumnCount = tonumber(DB.value([[
         SELECT COUNT(*)
         FROM information_schema.COLUMNS
@@ -77,13 +81,9 @@ CreateThread(function()
     DB.exec([[
         CREATE TABLE IF NOT EXISTS `bcchousinghotels` (
             `charidentifier` varchar(50) NOT NULL,
-            `hotels` LONGTEXT NOT NULL DEFAULT 'none'
+            `hotels` LONGTEXT NOT NULL DEFAULT 'none',
+            PRIMARY KEY (`charidentifier`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-    ]])
-
-    -- Add index to bcchousinghotels if it doesn't exist
-    DB.exec([[
-        CREATE INDEX IF NOT EXISTS `idx_charidentifier` ON `bcchousinghotels` (`charidentifier`);
     ]])
 
     -- Create the bcchousing_transactions table if it doesn't exist

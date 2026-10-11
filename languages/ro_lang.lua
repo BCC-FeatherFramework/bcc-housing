@@ -447,4 +447,5 @@ Feather.Locale.register("ro", {
     doorRemoveFailed = "Nu s-a putut sterge usa.",
     freeHouseBlipsHidden = "Blipurile caselor libere au fost ascunse.",
     freeHouseBlipsShown = "Blipurile caselor libere sunt acum vizibile.",
+    houseCreateFailed = "Crearea casei a eșuat.",
 })

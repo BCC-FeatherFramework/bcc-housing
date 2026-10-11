@@ -85,7 +85,27 @@ HousingRPC:Register('bcc-house:AdminManagementDelHouse', function(params, cb, sr
         return
     end
 
-    local affected = DB.exec("DELETE FROM bcchousing WHERE houseid=?", houseId)
+    -- Property first: a configured house is released (for sale again), a
+    -- staff-created house is retired. The row is deleted only when that succeeded.
+    local row = DB.one('SELECT houseid, uniqueName FROM bcchousing WHERE houseid = ?', tonumber(houseId))
+    if not row then
+        NotifyClient(src, _U('failedDeleteHouse'), 5000, "error")
+        if cb then cb(false) end
+        return
+    end
+    local propertyKey = HousingProperty.KeyForRow(row)
+    local requestId = HousingProperty.RequestId('admin-delete', row.houseid, Housing.NewId())
+    local released = (row.uniqueName and row.uniqueName ~= 'none' and row.uniqueName ~= '')
+        and HousingProperty.Release(propertyKey, requestId, src, 'housing.deleted')
+        or HousingProperty.Retire(propertyKey, requestId, src)
+    if not released.ok and released.code ~= 'property_not_found' then
+        DBG:Error('[AdminManagementDelHouse] property failed', released.code, released.message)
+        NotifyClient(src, _U('failedDeleteHouse'), 5000, "error")
+        if cb then cb(false) end
+        return
+    end
+
+    local affected = DB.exec("DELETE FROM bcchousing WHERE houseid=?", row.houseid)
     if affected and affected > 0 then
         NotifyClient(src, _U('housesDeleted'), 5000, "success")
         if cb then cb(true) end

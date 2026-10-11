@@ -440,4 +440,5 @@ Feather.Locale.register("en_us", {
     switchTab = "Switch tab",
     freeHouseBlipsHidden = "Free house blips have been hidden.",
     freeHouseBlipsShown = "Free house blips are now visible.",
+    houseCreateFailed = "Failed to create the house.",
 })

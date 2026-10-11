@@ -188,6 +188,14 @@ local function handleCreationDBInsert(src, tpHouse, owner, radius, doors, houseC
         return
     end
 
+    -- The owner is a Feather character UUID picked by staff; feather-property checks it exists.
+    owner = type(owner) == 'string' and owner:lower() or nil
+    if not owner or not owner:match('^%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x$') then
+        NotifyClient(src, _U('noAccessToHouse'), 4000, 'error')
+        if cbFn then cbFn(false, { error = 'invalid_owner' }) end
+        return
+    end
+
     local limitValue = tonumber(invLimit) or (pendingInventoryLimits[src] and tonumber(pendingInventoryLimits[src].invLimit))
     if not limitValue then
         limitValue = invLimit
@@ -234,12 +242,35 @@ local function handleCreationDBInsert(src, tpHouse, owner, radius, doors, houseC
 
     local result = DB.query('SELECT * FROM bcchousing WHERE charidentifier=?', param.charidentifier)
     if #result < Config.Setup.MaxHousePerChar then
-        DB.exec(
+        local houseId = DB.insert(
             'INSERT INTO bcchousing ( `charidentifier`,`house_radius_limit`,`doors`,`house_coords`,`invlimit`,`tax_amount`,`tpInt`,`tpInstance`, `uniqueName`, `ownershipStatus`, `purchaseCurrencyType`, `poly_points`, `poly_min_z`, `poly_max_z`, `purchased_at`) VALUES ( ?,?,?,?,?,?,?,?, ?, ?, ?, ?, ?, ?, NOW() )',
             param.charidentifier, param.radius, param.doors, param.houseCoords, param.invlimit, param.taxes,
             param.tpInt, param.tpInstance, param.uniqueName, param.ownershipStatus, param.purchaseCurrencyType,
             param.polyPoints, param.polyMinZ, param.polyMaxZ
         )
+
+        -- A staff-created house is its own property (bcc-housing:custom:<houseid>),
+        -- held by the chosen character as owner, or tenant when created as rented.
+        local propertyKey = houseId and HousingProperty.CustomKey(houseId)
+        local registeredProperty = propertyKey and HousingProperty.EnsureCustom(houseId,
+            ('House %s'):format(tostring(houseId))) or Housing.Err('insert_failed', 'House row was not created.')
+        local assigned = registeredProperty.ok and HousingProperty.Assign(propertyKey, param.charidentifier,
+            param.ownershipStatus == 'rented' and 'tenant' or 'owner',
+            HousingProperty.RequestId('create', houseId), src, 'housing.created') or registeredProperty
+        if not assigned.ok then
+            DBG:Error('handleCreationDBInsert: property failed', assigned.code, assigned.message)
+            if houseId then
+                DB.exec('DELETE FROM bcchousing WHERE houseid = ?', houseId)
+                if registeredProperty.ok then
+                    HousingProperty.Retire(propertyKey, HousingProperty.RequestId('create-undo', houseId), src)
+                end
+            end
+            NotifyClient(src, _U('houseCreateFailed'), 4000, 'error')
+            pendingInventoryLimits[src] = nil
+            if cbFn then cbFn(false, { error = assigned.code }) end
+            return
+        end
+        DB.exec('UPDATE bcchousing SET property_id = ? WHERE houseid = ?', assigned.value.propertyId, houseId)
 
         Discord:sendMessage(_U('houseCreatedWebhook') ..
             tostring(character.charIdentifier) .. _U('houseCreatedWebhookGivenToo') .. tostring(owner))

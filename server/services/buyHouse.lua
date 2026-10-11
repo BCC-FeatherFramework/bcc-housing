@@ -142,23 +142,40 @@ local function handleHousePurchase(src, houseCoords, moneyTypeParam, cb)
     local polyMinZ = tonumber(selectedHouse.polyMinZ)
     local polyMaxZ = tonumber(selectedHouse.polyMaxZ)
 
+    -- Ownership first: feather-property decides who holds the house. It refuses
+    -- when someone already holds it, so two buyers can never both get it.
+    local propertyKey = HousingProperty.HouseKey(selectedHouse.uniqueName)
+    local purchaseId = Housing.NewId()
+    local assigned = HousingProperty.Assign(propertyKey, character.charIdentifier,
+        isRental and 'tenant' or 'owner', HousingProperty.RequestId('purchase', selectedHouse.uniqueName, purchaseId),
+        src, isRental and 'housing.rent' or 'housing.purchase')
+    if not assigned.ok then
+        pendingHousePurchases[selectedHouse.uniqueName] = nil
+        DBG:Warning('handleHousePurchase: property refused', selectedHouse.uniqueName, assigned.code, assigned.message)
+        NotifyClient(src, _U('housePurchaseFailed'), 4000, 'error')
+        if cbFn then cbFn(false, { error = assigned.code }) end
+        return
+    end
+
     local insertOk, houseId = pcall(DB.insert, [[
         INSERT INTO `bcchousing`
             (`charidentifier`, `house_coords`, `house_radius_limit`, `doors`, `invlimit`, `tax_amount`,
              `tpInt`, `tpInstance`, `uniqueName`, `ownershipStatus`, `purchaseCurrencyType`,
-             `poly_points`, `poly_min_z`, `poly_max_z`, `purchased_at`)
+             `poly_points`, `poly_min_z`, `poly_max_z`, `purchased_at`, `property_id`)
         SELECT
             ?, ?, ?, ?, ?, ?,
             ?, ?, ?, ?, ?,
-            ?, ?, ?, NOW()
+            ?, ?, ?, NOW(), ?
         WHERE NOT EXISTS (SELECT 1 FROM `bcchousing` WHERE `uniqueName` = ?)
     ]], character.charIdentifier, houseCoordsJson, houseRadiusLimit, '[]', selectedHouse.invLimit, taxAmount,
         selectedHouse.tpInt, selectedHouse.tpInstance, selectedHouse.uniqueName, ownershipStatus, currencyType,
-        polyPoints, polyMinZ, polyMaxZ, selectedHouse.uniqueName)
+        polyPoints, polyMinZ, polyMaxZ, assigned.value.propertyId, selectedHouse.uniqueName)
     pendingHousePurchases[selectedHouse.uniqueName] = nil
 
     if not insertOk or not houseId or tonumber(houseId) == 0 then
         DBG:Info('handleHousePurchase: house already owned or insert failed for ' .. tostring(selectedHouse.uniqueName))
+        -- Undo the ownership so the house is for sale again.
+        HousingProperty.Release(propertyKey, HousingProperty.RequestId('purchase-undo', purchaseId), src, 'housing.purchase_failed')
         NotifyClient(src, _U('housePurchaseFailed'), 4000, 'error')
         if cbFn then cbFn(false) end
         return

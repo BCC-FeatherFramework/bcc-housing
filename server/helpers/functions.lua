@@ -31,13 +31,16 @@ function IsHousingAdmin(src)
     return false
 end
 
+-- True when the player's character holds the house (owner, or tenant of a rented
+-- house) in feather-property.
 function IsHouseOwner(src, houseId)
     local character = GetHousingCharacter(src)
     local numericHouseId = tonumber(houseId)
     if not character or not numericHouseId then return false end
 
-    local owner = DB.value('SELECT charidentifier FROM bcchousing WHERE houseid = ?', numericHouseId)
-    return owner ~= nil and tostring(owner) == tostring(character.charIdentifier)
+    local row = DB.one('SELECT houseid, uniqueName FROM bcchousing WHERE houseid = ?', numericHouseId)
+    if not row then return false end
+    return HousingProperty.Holds(HousingProperty.KeyForRow(row), character.charIdentifier) == true
 end
 
 function IsDoorOwnedByCharacter(src, doorId)

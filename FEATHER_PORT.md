@@ -16,7 +16,7 @@ domains that own them; bcc-housing keeps no money and no ownership truth.
 |---|---|---|
 | H1 Foundation | Feather adapters (DBG, RPC, notifications, characters, webhook), feather-toolkit prompts/blips/peds/objects/keys, feather-menu-v2 wrapper, Core locales, Feather character events, manifest on Feather only, PolyZone optional | code complete |
 | H2 Staff and jobs | Authority capability `staff.housing.manage` (role `staff.housing.admin`, `HousingAdminGrant`/`HousingAdminRevoke`) + Feather Admin staff capability; realtor (`Config.Admin.jobs`) and agent shop jobs through feather-jobs `CheckAssignment` | code complete |
-| H3 Property | Configured houses and hotels registered in feather-property (`bcc-housing:<uniqueName>`, `bcc-housing:hotel:<hotelId>`); custom houses on creation; owners/co-owners/tenants as interests; UUID schema; `property_id` link column | |
+| H3 Property | Configured houses and hotels registered in feather-property on start (`bcc-housing:<uniqueName>`, `bcc-housing:hotel:<hotelId>`); staff-created houses on creation (`bcc-housing:custom:<houseid>`); purchase/rent, sale to player and agent, unrent, staff delete and hotel rooms go through Property interests (one holder per house: owner or tenant); `IsHouseOwner` and hotel checks ask Property; `property_id` link; start-up reconciliation; `HousingPropertyStatus <houseid>` | code complete |
 | H4 Money | Purchase, rent, taxes and rent with a paid-until date (no ledger), sale to player and to the NPC agent, furniture purchase and sell-back, storage upgrades: all through feather-economy | |
 | H5 Storage and deeds | House and hotel storage as feather-inventory containers; deed as an inventory item with `propertyId` metadata | |
 | H6 Doors, access, instances | Doors through the bcc-doorlocks server API (no direct table writes); guest list kept locally until feather-access; instances through feather-routing (server-chosen) | |
@@ -46,5 +46,17 @@ domains that own them; bcc-housing keeps no money and no ownership truth.
 |---|---|---|
 | feather-authority `config.lua` | `trustedReaders`, `trustedCapabilityRegistrars`, `trustedRoleCreators`, `trustedGrantors`, `trustedAssigners` | H2 (added on the dev server) |
 | feather-jobs `config.lua` | `trustedReaders` | H2 (added on the dev server) |
-| feather-property, feather-admin service policy | managers/readers/auditors; `property.property.manage`, `property.interest.manage` | H3 |
+| feather-property `config.lua`; feather-admin `configs/service_policy.lua` | `trustedReaders`, `trustedManagers`, `trustedAuditors`; `['feather-property']['bcc-housing']` `property.property.manage`, `property.interest.manage` | H3 (added on the dev server) |
 | feather-economy, feather-admin service policy | readers, provisioners, transactors, suppliers; `economy.currency.issue` (NPC sale) | H4 |
+- **Holder cache:** `bcchousing.charidentifier` and `bcchousinghotels` only cache the
+  holder; feather-property is the truth. On start every configured house and hotel is
+  registered and each house row is reconciled (a different holder fixes the cache; a row
+  without a holder is reported, not deleted).
+- **Roommates** (`allowed_ids`, up to `playerMax`) get door and house access but cannot
+  sell or manage the house. They are delegated access, not ownership, so they stay in
+  bcc-housing until feather-access exists (the Access master plan defers it).
+- **No VORP data migration:** the development database has no bcc-housing tables; VORP
+  numeric character IDs could not be mapped to Feather characters anyway.
+- **To fix in H4:** sale to another player takes the buyer's money without asking them
+  (original behaviour); the buyer will have to accept, and money moves only through
+  Economy after the Property transfer is confirmed.

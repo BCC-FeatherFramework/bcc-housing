@@ -49,7 +49,8 @@ local function handleSellHouse(src, houseIdParam, cb)
             return
         end
 
-        if tostring(houseData.charidentifier) ~= tostring(charIdentifier) then
+        local propertyKey = HousingProperty.KeyForRow(houseData)
+        if not HousingProperty.Holds(propertyKey, charIdentifier, 'owner') then
             DBG:Info('handleSellHouse: player does not own house ' .. tostring(houseId))
             NotifyClient(src, _U('noHouseOrNotOwner'), 4000, 'error')
             if cbFn then cbFn(false) end
@@ -79,6 +80,15 @@ local function handleSellHouse(src, houseIdParam, cb)
         end
 
         local sellPrice = tonumber(houseConfig.sellPrice) or 0
+        -- Ownership ends in feather-property first; the house is for sale again.
+        local released = HousingProperty.Release(propertyKey,
+            HousingProperty.RequestId('sell-npc', houseData.houseid, Housing.NewId()), src, 'housing.sold_to_agent')
+        if not released.ok then
+            DBG:Error('handleSellHouse: property release failed', released.code, released.message)
+            NotifyClient(src, _U('houseCannotBeSold'), 4000, 'error')
+            if cbFn then cbFn(false, { error = released.code }) end
+            return
+        end
         DB.exec('DELETE FROM bcchousing WHERE houseid = ?', houseData.houseid)
 
         if houseData.doors and houseData.doors ~= 'none' then
@@ -144,12 +154,21 @@ local function handleUnrentHouse(src, houseIdParam, cb)
             return
         end
 
-        if tostring(houseData.charidentifier) ~= tostring(charIdentifier) then
+        local propertyKey = HousingProperty.KeyForRow(houseData)
+        if not HousingProperty.Holds(propertyKey, charIdentifier, 'tenant') then
             NotifyClient(src, _U('noHouseOrNotOwner'), 4000, 'error')
             if cbFn then cbFn(false) end
             return
         end
 
+        -- The tenancy ends in feather-property first; the house is for rent again.
+        local released = HousingProperty.Release(propertyKey,
+            HousingProperty.RequestId('unrent', houseData.houseid, Housing.NewId()), src, 'housing.rent_ended')
+        if not released.ok then
+            DBG:Error('handleUnrentHouse: property release failed', released.code, released.message)
+            if cbFn then cbFn(false, { error = released.code }) end
+            return
+        end
         DB.exec('DELETE FROM bcchousing WHERE houseid = ?', houseData.houseid)
 
         if houseData.doors and houseData.doors ~= 'none' then
@@ -228,6 +247,12 @@ local function handleSellHouseToPlayerWithInventory(src, houseIdParam, targetPla
         end
 
         local houseData = result[1]
+        local propertyKey = HousingProperty.KeyForRow(houseData)
+        if not HousingProperty.Holds(propertyKey, charIdentifier, 'owner') then
+            NotifyClient(src, _U('houseNotOwnedOrExist'), 4000, 'error')
+            if cbFn then cbFn(false) end
+            return
+        end
         local houseConfig = findHouseConfigByUniqueName(houseData.uniqueName)
         if not houseConfig or not houseConfig.canSell or tonumber(houseConfig.currencyType) == 2 then
             NotifyClient(src, _U('houseCannotBeSold'), 4000, 'error')
@@ -251,6 +276,16 @@ local function handleSellHouseToPlayerWithInventory(src, houseIdParam, targetPla
         end
 
         targetCharacter.removeCurrency(0, salePrice)
+
+        -- Ownership moves in feather-property first (seller must still own it).
+        local transferred = HousingProperty.Transfer(propertyKey, charIdentifier, targetCharIdentifier,
+            HousingProperty.RequestId('sell-player', houseId, Housing.NewId()), src)
+        if not transferred.ok then
+            DBG:Error('sale to player: property transfer failed', transferred.code, transferred.message)
+            NotifyClient(src, _U('houseCannotBeSold'), 4000, 'error')
+            if cbFn then cbFn(false, { error = transferred.code }) end
+            return
+        end
 
         local affectedRows = DB.exec(
             'UPDATE bcchousing SET charidentifier = ?, purchaseCurrencyType = ? WHERE houseid = ?',
@@ -345,6 +380,12 @@ local function handleSellHouseToPlayerWithoutInventory(src, houseIdParam, target
         end
 
         local houseData = result[1]
+        local propertyKey = HousingProperty.KeyForRow(houseData)
+        if not HousingProperty.Holds(propertyKey, charIdentifier, 'owner') then
+            NotifyClient(src, _U('houseNotOwnedOrExist'), 4000, 'error')
+            if cbFn then cbFn(false) end
+            return
+        end
         local houseConfig = findHouseConfigByUniqueName(houseData.uniqueName)
         if not houseConfig or not houseConfig.canSell or tonumber(houseConfig.currencyType) == 2 then
             NotifyClient(src, _U('houseCannotBeSold'), 4000, 'error')
@@ -368,6 +409,16 @@ local function handleSellHouseToPlayerWithoutInventory(src, houseIdParam, target
         end
 
         targetCharacter.removeCurrency(0, salePrice)
+
+        -- Ownership moves in feather-property first (seller must still own it).
+        local transferred = HousingProperty.Transfer(propertyKey, charIdentifier, targetCharIdentifier,
+            HousingProperty.RequestId('sell-player', houseId, Housing.NewId()), src)
+        if not transferred.ok then
+            DBG:Error('sale to player: property transfer failed', transferred.code, transferred.message)
+            NotifyClient(src, _U('houseCannotBeSold'), 4000, 'error')
+            if cbFn then cbFn(false, { error = transferred.code }) end
+            return
+        end
 
         local affectedRows = DB.exec(
             'UPDATE bcchousing SET charidentifier = ?, furniture = "none", doors = "none", purchaseCurrencyType = ? WHERE houseid = ?',
