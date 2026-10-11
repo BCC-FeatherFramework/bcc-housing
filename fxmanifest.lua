@@ -38,6 +38,8 @@ client_scripts {
 server_scripts {
     '@feather-mysql/lib/DB.lua',
     'server/feather/init.lua',
+    'server/feather/authority.lua',
+    'server/feather/jobs.lua',
     'server/helpers/functions.lua',
     'server/helpers/propertyDocuments.lua',
     'server/services/*.lua',

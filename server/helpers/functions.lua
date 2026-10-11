@@ -9,20 +9,25 @@ function GetHousingCharacter(src)
     return HousingCharacters.Get(src)
 end
 
+-- Housing staff: the console, Feather Admin administrators/owners, holders of
+-- staff.housing.manage (HousingAdminGrant), or holders of a Config.Admin.jobs job.
+-- Fails closed.
 function IsHousingAdmin(src)
+    local admin = Config.Admin or {}
+    if tonumber(src) == 0 then return admin.allowConsole ~= false end
     local character = GetHousingCharacter(src)
     if not character then return false end
 
-    if character.group == Config.adminGroup then
+    local allowed, reason = HousingAuthority.IsAllowed(src)
+    if allowed then
+        DBG:Info('[admin] allowed', src, reason)
         return true
     end
-
-    for _, jobCfg in ipairs(Config.ALlowedJobs or {}) do
-        if character.job == jobCfg.jobname then
-            return true
-        end
+    if HousingJobs.HoldsAny(character.charIdentifier, admin.jobs, admin.jobRequireOnDuty) then
+        DBG:Info('[admin] allowed by job', src)
+        return true
     end
-
+    DBG:Info('[admin] denied', src, reason)
     return false
 end
 

@@ -291,18 +291,7 @@ HousingRPC:Register('bcc-housing:SaveExistingHousePolyZone', function(params, cb
         return
     end
 
-    local user = HousingUser(src)
-    local character = user and user.getUsedCharacter
-    local allowed = character and character.group == Config.adminGroup
-
-    if not allowed then
-        for _, jobCfg in ipairs(Config.ALlowedJobs or {}) do
-            if character and character.job == jobCfg.jobname then
-                allowed = true
-                break
-            end
-        end
-    end
+    local allowed = IsHousingAdmin(src)
 
     if not allowed then
         NotifyClient(src, _U('noAccessToHouse'), 4000, 'error')

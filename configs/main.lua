@@ -30,14 +30,23 @@ Config = {
     },
     -----------------------------------------------------
 
-    -- Set your admin group here
-    adminGroup = 'admin',
-    -----------------------------------------------------
-
-    -- Jobs that will be able to make houses just like the admins can above. Useful for real estate jobs
-    ALlowedJobs = {
-        { jobname = 'realtor' }, --to add more just copy/paste and change job name
+    -- Housing staff (create, edit and delete houses; manage any house) is a
+    -- feather-authority capability. bcc-housing registers the capability and one
+    -- role that grants it; give the role from the server console:
+    --   HousingAdminGrant <server id> / HousingAdminRevoke <server id>
+    Admin = {
+        allowConsole = true,
+        capability = 'staff.housing.manage',
+        role = 'staff.housing.admin',
+        -- Feather Admin capabilities that also count as staff. staff.admin.audit.search
+        -- is held by Admin administrators and owners (feather-admin configs/permissions.lua).
+        staffCapabilities = { 'staff.admin.audit.search' },
+        -- feather-jobs job keys whose holders may also create houses (real estate);
+        -- { name = 'realtor', grade = 10 } adds a minimum grade ordinal.
+        jobs = { 'realtor' },
+        jobRequireOnDuty = false
     },
+    -- Agent shop jobs (configs/npcAgents.lua) are feather-jobs job keys and grade ordinals too.
     -----------------------------------------------------
 
     -- Commands

@@ -15,7 +15,7 @@ domains that own them; bcc-housing keeps no money and no ownership truth.
 | Phase | Scope | State |
 |---|---|---|
 | H1 Foundation | Feather adapters (DBG, RPC, notifications, characters, webhook), feather-toolkit prompts/blips/peds/objects/keys, feather-menu-v2 wrapper, Core locales, Feather character events, manifest on Feather only, PolyZone optional | code complete |
-| H2 Staff and jobs | Authority capability `staff.housing.manage` + Feather Admin staff capability; agent/realtor jobs through feather-jobs `CheckAssignment` | |
+| H2 Staff and jobs | Authority capability `staff.housing.manage` (role `staff.housing.admin`, `HousingAdminGrant`/`HousingAdminRevoke`) + Feather Admin staff capability; realtor (`Config.Admin.jobs`) and agent shop jobs through feather-jobs `CheckAssignment` | code complete |
 | H3 Property | Configured houses and hotels registered in feather-property (`bcc-housing:<uniqueName>`, `bcc-housing:hotel:<hotelId>`); custom houses on creation; owners/co-owners/tenants as interests; UUID schema; `property_id` link column | |
 | H4 Money | Purchase, rent, taxes and rent with a paid-until date (no ledger), sale to player and to the NPC agent, furniture purchase and sell-back, storage upgrades: all through feather-economy | |
 | H5 Storage and deeds | House and hotel storage as feather-inventory containers; deed as an inventory item with `propertyId` metadata | |
@@ -39,3 +39,12 @@ domains that own them; bcc-housing keeps no money and no ownership truth.
 - Character objects come from Core sessions (`HousingCharacters.Get`); `HousingUser(src)`
   keeps the old `user.getUsedCharacter` call shape until the money phase rewrites the
   call sites that read balances.
+
+## Trust entries needed
+
+| Resource | Entries for `bcc-housing` | Phase |
+|---|---|---|
+| feather-authority `config.lua` | `trustedReaders`, `trustedCapabilityRegistrars`, `trustedRoleCreators`, `trustedGrantors`, `trustedAssigners` | H2 (added on the dev server) |
+| feather-jobs `config.lua` | `trustedReaders` | H2 (added on the dev server) |
+| feather-property, feather-admin service policy | managers/readers/auditors; `property.property.manage`, `property.interest.manage` | H3 |
+| feather-economy, feather-admin service policy | readers, provisioners, transactors, suppliers; `economy.currency.issue` (NPC sale) | H4 |
