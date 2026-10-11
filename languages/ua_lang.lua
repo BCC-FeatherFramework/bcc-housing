@@ -1,5 +1,5 @@
 ---------------------------------- ENGLISH -------------------------------------------
-Locales["ua_lang"] = {
+Feather.Locale.register("uk", {
     doorId = "ID Дверей: ",
     creationMenuName = "Ваш будинок",
     setInvLimit = "Встановити розмір сховища ",
@@ -444,4 +444,4 @@ Locales["ua_lang"] = {
     switchTab = "Switch tab",
     freeHouseBlipsHidden = "Free house blips have been hidden.",
     freeHouseBlipsShown = "Free house blips are now visible.",
-}
+})

@@ -111,6 +111,14 @@ function HousingCharacters.FindSource(characterId)
     return nil
 end
 
+-- Same shape as HousingUser(src): nil without an active character, else a
+-- table whose getUsedCharacter is the character above. Keeps the existing
+-- `user.getUsedCharacter` call sites unchanged.
+function HousingUser(src)
+    local character = HousingCharacters.Get(src)
+    return character and { getUsedCharacter = character } or nil
+end
+
 AddEventHandler('onResourceStart', function(resource)
     if resource == 'feather-character' then names = {} end
 end)

@@ -176,7 +176,7 @@ local function handleCreationDBInsert(src, tpHouse, owner, radius, doors, houseC
     local taxesValue = tonumber(taxAmount)
     local taxes = (taxesValue and taxesValue > 0) and taxesValue or 0
 
-    local user = VORPcore.getUser(src)
+    local user = HousingUser(src)
     if not user then
         if cbFn then cbFn(false, { error = 'no_user' }) end
         return
@@ -291,7 +291,7 @@ HousingRPC:Register('bcc-housing:SaveExistingHousePolyZone', function(params, cb
         return
     end
 
-    local user = VORPcore.getUser(src)
+    local user = HousingUser(src)
     local character = user and user.getUsedCharacter
     local allowed = character and character.group == Config.adminGroup
 
@@ -361,7 +361,7 @@ end)
 
 
 local function refreshPlayerHouses(targetSource)
-    local user = VORPcore.getUser(targetSource)
+    local user = HousingUser(targetSource)
     if not user then
         DBG:Info("refreshPlayerHouses: no user for source " .. tostring(targetSource))
         return nil
@@ -467,7 +467,7 @@ HousingRPC:Register('bcc-house:OpenHouseInv', function(params, cb, src)
         return
     end
 
-    local user = VORPcore.getUser(src)
+    local user = HousingUser(src)
     if not user then
         if cb then cb(false, { error = _U('noHouseFound') }) end
         return
@@ -565,7 +565,7 @@ HousingRPC:Register('bcc-housing:GetInventoryStages', function(params, cb, src)
         return
     end
 
-    local user = VORPcore.getUser(src)
+    local user = HousingUser(src)
     local character = user and user.getUsedCharacter
     local charIdentifier = character and character.charIdentifier
 
@@ -599,7 +599,7 @@ HousingRPC:Register('bcc-housing:UpgradeInventory', function(params, cb, src)
         return
     end
 
-    local user = VORPcore.getUser(src)
+    local user = HousingUser(src)
     if not user then
         if cb then cb(false, { error = 'no_user' }) end
         return
@@ -906,7 +906,7 @@ local function handleLedgerHandling(src, amountParam, houseIdParam, isAdding, cb
         return
     end
 
-    local user = VORPcore.getUser(src)
+    local user = HousingUser(src)
     if not user then
         if cbFn then cbFn(false, { error = 'no_user' }) end
         return
@@ -1125,7 +1125,7 @@ HousingRPC:Register('bcc-housing:getHouseId', function(params, cb, src)
         return
     end
 
-    local user = VORPcore.getUser(src)
+    local user = HousingUser(src)
     if not user then
         if cb then cb(false, { error = _U('noHouseFound') }) end
         return
@@ -1200,7 +1200,7 @@ HousingRPC:Register('bcc-housing:getHouseOwner', function(params, cb, src)
         return
     end
 
-    local user = VORPcore.getUser(src)
+    local user = HousingUser(src)
     if not user then
         if cb then cb(false, { error = _U('noHouseFound') }) end
         return
@@ -1246,7 +1246,7 @@ HousingRPC:Register('bcc-housing:GetHouseContext', function(params, cb, src)
         return
     end
 
-    local user = VORPcore.getUser(src)
+    local user = HousingUser(src)
     if not user then
         if cb then cb(false, { error = _U('noHouseFound') }) end
         return

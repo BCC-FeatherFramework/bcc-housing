@@ -1,5 +1,5 @@
 ---------------------------------- ENGLISH -------------------------------------------
-Locales["de_lang"] = {
+Feather.Locale.register("de", {
     doorId = 'Tür ID: ',
     creationMenuName = 'Housing',
     setInvLimit = 'Lagerlimit',
@@ -441,4 +441,4 @@ Locales["de_lang"] = {
     switchTab = "Switch tab",
     freeHouseBlipsHidden = "Free house blips have been hidden.",
     freeHouseBlipsShown = "Free house blips are now visible.",
-}
+})

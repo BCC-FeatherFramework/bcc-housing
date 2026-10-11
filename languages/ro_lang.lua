@@ -1,5 +1,5 @@
 ---------------------------------- Romanian -------------------------------------------
-Locales["ro_lang"] = {
+Feather.Locale.register("ro", {
 	doorId = 'ID Usa: ',
 	creationMenuName = 'Locuinta',
 	setInvLimit = 'Limita Inventar',
@@ -447,4 +447,4 @@ Locales["ro_lang"] = {
     doorRemoveFailed = "Nu s-a putut sterge usa.",
     freeHouseBlipsHidden = "Blipurile caselor libere au fost ascunse.",
     freeHouseBlipsShown = "Blipurile caselor libere sunt acum vizibile.",
-}
+})

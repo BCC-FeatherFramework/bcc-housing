@@ -384,7 +384,7 @@ HousingRPC:Register('bcc-housing:FurnSoldRemoveFromTable', function(params, cb, 
 end)
 
 function getCharacter(source)
-    local user = VORPcore.getUser(source)
+    local user = HousingUser(source)
     if not user then return nil end
     return user.getUsedCharacter
 end

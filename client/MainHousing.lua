@@ -121,15 +121,15 @@ end)
 function ManageHotelBlips()
     for _, hotelCfg in pairs(Hotels) do
         if hotelCfg.blip and hotelCfg.blip.show and not hotelCfg.Blip then
-            hotelCfg.Blip = BccUtils.Blips:SetBlip(hotelCfg.blip.name, hotelCfg.blip.sprite, hotelCfg.blip.scale, hotelCfg.location.x, hotelCfg.location.y, hotelCfg.location.z)
-            local blipModifier = BccUtils.Blips:AddBlipModifier(hotelCfg.Blip, Config.BlipColors[hotelCfg.blip.color])
+            hotelCfg.Blip = HousingBlips:SetBlip(hotelCfg.blip.name, hotelCfg.blip.sprite, hotelCfg.blip.scale, hotelCfg.location.x, hotelCfg.location.y, hotelCfg.location.z)
+            local blipModifier = HousingBlips:AddBlipModifier(hotelCfg.Blip, Config.BlipColors[hotelCfg.blip.color])
             blipModifier:ApplyModifier()
             table.insert(HotelBlips, hotelCfg.Blip)
         end
     end
 end
 
-RegisterNetEvent('vorp:SelectedCharacter', function()
+local function StartForCharacter()
     HousingRPC:Notify('bcc-housing:getPlayersInfo', {})
     checkIfAdmin()
     local success, hotels = HousingRPC:CallAsync('bcc-housing:HotelDbRegistry', {})
@@ -144,27 +144,17 @@ RegisterNetEvent('vorp:SelectedCharacter', function()
         HotelHandlerStarted = true
         MainHotelHandler()
     end
+end
+
+RegisterNetEvent('Feather:Character:Spawned', function()
+    StartForCharacter()
 end)
 
-CreateThread(function() -- Devmode area
-    if Config.DevMode then
-        --RegisterCommand(Config.DevModeCommand, function()
-            HousingRPC:Notify('bcc-housing:getPlayersInfo', {})
-            checkIfAdmin()
-            local success, hotels = HousingRPC:CallAsync('bcc-housing:HotelDbRegistry', {})
-            if success and type(hotels) == 'table' then
-                OwnedHotels = hotels
-            else
-                OwnedHotels = {}
-            end
-            HousingRPC:CallAsync('bcc-housing:CheckIfHasHouse', {})
-            ManageHotelBlips()
-            if not HotelHandlerStarted then
-                HotelHandlerStarted = true
-                MainHotelHandler()
-            end
-        --end, false)
-    end
+-- Feather:Character:Spawned fires once; catch up after a resource restart.
+CreateThread(function()
+    Wait(2000)
+    local ok, active = pcall(function() return exports['feather-character']:HasActiveCharacter() end)
+    if ok and active == true then StartForCharacter() end
 end)
 
 local function handleOwnsHouseClient(houseTable, owner)
@@ -221,8 +211,8 @@ local function handleOwnsHouseClient(houseTable, owner)
         if houseCfg.uniqueName == uniqueName then
             houseCfgFound = true
             if houseCfg.blip.owned.active then
-                local blip = BccUtils.Blips:SetBlip(houseCfg.blip.owned.name, houseCfg.blip.owned.sprite, 0.2, vectorCoords.x, vectorCoords.y, vectorCoords.z)
-                local blipModifier = BccUtils.Blips:AddBlipModifier(blip, Config.BlipColors[houseCfg.blip.owned.color])
+                local blip = HousingBlips:SetBlip(houseCfg.blip.owned.name, houseCfg.blip.owned.sprite, 0.2, vectorCoords.x, vectorCoords.y, vectorCoords.z)
+                local blipModifier = HousingBlips:AddBlipModifier(blip, Config.BlipColors[houseCfg.blip.owned.color])
                 blipModifier:ApplyModifier()
                 table.insert(HouseBlips, blip)
                 break
@@ -232,8 +222,8 @@ local function handleOwnsHouseClient(houseTable, owner)
 
     if not houseCfgFound and Config.HouseBlip.active then
         local houseBlip = Config.HouseBlip
-        local blip = BccUtils.Blips:SetBlip(houseBlip.name, houseBlip.sprite, 0.2, vectorCoords.x, vectorCoords.y, vectorCoords.z)
-        local blipModifier = BccUtils.Blips:AddBlipModifier(blip, Config.BlipColors[houseBlip.color])
+        local blip = HousingBlips:SetBlip(houseBlip.name, houseBlip.sprite, 0.2, vectorCoords.x, vectorCoords.y, vectorCoords.z)
+        local blipModifier = HousingBlips:AddBlipModifier(blip, Config.BlipColors[houseBlip.color])
         blipModifier:ApplyModifier()
         table.insert(HouseBlips, blip)
     end
@@ -259,16 +249,16 @@ end)
 function MainHotelHandler()
     DBG:Info("Initializing main hotel handler")
 
-    local buyGroup = BccUtils.Prompts:SetupPromptGroup()
+    local buyGroup = HousingPrompts:SetupPromptGroup()
     local buyPrompt = buyGroup:RegisterPrompt(_U("promptBuy"), HousingKeys[Config.keys.buy], 1, 1, true, 'click', nil)
 
-    local enterGroup = BccUtils.Prompts:SetupPromptGroup()
+    local enterGroup = HousingPrompts:SetupPromptGroup()
     local enterPrompt = enterGroup:RegisterPrompt(_U("promptEnterHotel"), HousingKeys[Config.keys.manage], 1, 1, true, 'click', nil)
 
-    local inventoryGroup = BccUtils.Prompts:SetupPromptGroup()
+    local inventoryGroup = HousingPrompts:SetupPromptGroup()
     local inventoryPrompt = inventoryGroup:RegisterPrompt(_U("hotelInvName"), HousingKeys[Config.keys.manage], 1, 1, true, 'click', nil)
 
-    local leaveGroup = BccUtils.Prompts:SetupPromptGroup()
+    local leaveGroup = HousingPrompts:SetupPromptGroup()
     local leavePrompt = leaveGroup:RegisterPrompt(_U("promptLeaveHotel"), HousingKeys[Config.keys.manage], 1, 1, true, 'click', nil)
 
     local inHotel, hotelInside, instanceNumber, coordsWhenEntered = false, nil, 0, nil
@@ -360,14 +350,14 @@ end
 
 local function clearHouseBlips(houseId)
     if HouseBlips[houseId] then
-        BccUtils.Blips:RemoveBlip(HouseBlips[houseId].rawblip) 
+        HousingBlips:RemoveBlip(HouseBlips[houseId].rawblip) 
         HouseBlips[houseId] = nil
     end
 
     if HouseBlips and next(HouseBlips) then
         for _, blipData in pairs(HouseBlips) do
             if blipData and blipData.rawblip then
-                BccUtils.Blips:RemoveBlip(blipData.rawblip)
+                HousingBlips:RemoveBlip(blipData.rawblip)
             end
         end
         HouseBlips = {}

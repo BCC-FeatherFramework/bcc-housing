@@ -1,5 +1,5 @@
 ---------------------------------- French translation by #slipknot4512 -------------------------------------------
-Locales["fr_lang"] = {
+Feather.Locale.register("fr", {
     doorId = 'ID de la porte : ',
     creationMenuName = 'Logement',
     setInvLimit = 'Limite d\'inventaire',
@@ -441,4 +441,4 @@ Locales["fr_lang"] = {
     switchTab = "Switch tab",
     freeHouseBlipsHidden = "Free house blips have been hidden.",
     freeHouseBlipsShown = "Free house blips are now visible.",
-}
+})

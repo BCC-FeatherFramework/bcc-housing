@@ -2,7 +2,7 @@ local AgentPrompt
 local AgentPromptGroupObj
 
 local function StartAgentPrompt()
-    AgentPromptGroupObj = BccUtils.Prompts:SetupPromptGroup()
+    AgentPromptGroupObj = HousingPrompts:SetupPromptGroup()
     AgentPrompt = AgentPromptGroupObj:RegisterPrompt(
         _U("collectFromDealer"),
         HousingKeys[Config.keys.collect],
@@ -34,7 +34,7 @@ local function ManageShopBlips(shop, closed)
     if not Agents[shop].Blip then
         local coords = shopCfg.npc.coords
 
-        Agents[shop].Blip = BccUtils.Blip:SetBlip(
+        Agents[shop].Blip = HousingBlips:SetBlip(
             shopCfg.blip.name,
             shopCfg.blip.sprite,
             shopCfg.blip.scale or 0.2,
@@ -54,7 +54,7 @@ local function ManageShopBlips(shop, closed)
 
     local colorModifier = Config.BlipColors[color]
     if colorModifier and Agents[shop].Blip then
-        local modifier = BccUtils.Blip:AddBlipModifier(Agents[shop].Blip, colorModifier)
+        local modifier = HousingBlips:AddBlipModifier(Agents[shop].Blip, colorModifier)
         modifier:ApplyModifier()
     end
 end
@@ -67,8 +67,8 @@ local function AddShopNpcs(shop)
         local model = shopCfg.npc.model
         local heading = shopCfg.npc.heading
 
-        -- Use BccUtils.Ped (PedAPI) to create the NPC
-        shopCfg.NPC = BccUtils.Ped:Create(
+        -- Create the NPC through feather-toolkit (client/feather/toolkit.lua)
+        shopCfg.NPC = HousingPed:Create(
             model,               -- modelhash (string or hash)
             coords.x,
             coords.y,
@@ -83,11 +83,13 @@ local function AddShopNpcs(shop)
         )
 
         -- Extra flags like in your original code
-        shopCfg.NPC:CanBeDamaged(false)
-        shopCfg.NPC:Invincible(true)
-        Wait(500)
-        shopCfg.NPC:Freeze(true)
-        shopCfg.NPC:SetBlockingOfNonTemporaryEvents(true)
+        if shopCfg.NPC then
+            shopCfg.NPC:CanBeDamaged(false)
+            shopCfg.NPC:Invincible(true)
+            Wait(500)
+            shopCfg.NPC:Freeze(true)
+            shopCfg.NPC:SetBlockingOfNonTemporaryEvents(true)
+        end
     end
 end
 

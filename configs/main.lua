@@ -1,6 +1,6 @@
 Config = {
-    -- Set your language here
-    defaultlang = 'en_lang',
+    -- Language: translations come from feather-core, so each player sees their own
+    -- language (languages/*.lua register en_us, ro, pl, de, fr and uk).
     -----------------------------------------------------
 
     DevMode = false,               -- False on live server
@@ -15,12 +15,11 @@ Config = {
     },
     -----------------------------------------------------
 
-    Notify = "feather-menu",
+    -- Notifications are shown through feather-notify (via feather-core on the server).
+    NotifyStyle = 'right', -- feather-notify style
     NotifyOptions = {
-        type = "info",
-        autoClose = 4000,
-        position = "bottom-center",
-        transition = "slide"
+        type = "info",     -- default type (logged in dev mode)
+        autoClose = 4000   -- default duration in ms
     },
     -----------------------------------------------------
 

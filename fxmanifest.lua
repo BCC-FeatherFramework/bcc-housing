@@ -14,8 +14,13 @@ shared_scripts {
     'shared/init.lua'
 }
 
+-- PolyZone is optional: to draw house outlines, start the PolyZone resource and
+-- add '@PolyZone/client.lua' as the first client script. Without it the built-in
+-- polygon check is used.
 client_scripts {
-    '@PolyZone/client.lua',
+    'client/feather/init.lua',
+    'client/feather/toolkit.lua',
+    'client/feather/menu_v2.lua',
     'client/functions.lua',
     'client/MainHousing.lua',
     'client/propertyCheck.lua',
@@ -32,6 +37,7 @@ client_scripts {
 
 server_scripts {
     '@feather-mysql/lib/DB.lua',
+    'server/feather/init.lua',
     'server/helpers/functions.lua',
     'server/helpers/propertyDocuments.lua',
     'server/services/*.lua',
@@ -48,14 +54,19 @@ files {
     'stream/Siddin4.ymap',
 }
 
-dependency {
-    'vorp_core',
-    'vorp_inventory',
-    'vorp_character',
-    'bcc-utils',
-    'bcc-doorlocks',
-    'feather-menu',
-    'PolyZone'
+dependencies {
+    'feather-mysql',
+    'feather-core',
+    'feather-character',
+    'feather-notify',
+    'feather-toolkit',
+    'feather-menu-v2',
+    'feather-inventory',
+    'feather-economy',
+    'feather-property',
+    'feather-authority',
+    'feather-jobs',
+    'bcc-doorlocks'
 }
 
-version '2.5.0'
+version '3.0.0'

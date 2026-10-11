@@ -17,9 +17,9 @@ local function handleSellHouse(src, houseIdParam, cb)
         return
     end
 
-    local user = VORPcore.getUser(src)
+    local user = HousingUser(src)
     if not user then
-        DBG:Info('handleSellHouse: no VORP user for source ' .. tostring(src))
+        DBG:Info('handleSellHouse: no active character for source ' .. tostring(src))
         if cbFn then cbFn(false, { error = 'no_user' }) end
         return
     end
@@ -123,7 +123,7 @@ local function handleUnrentHouse(src, houseIdParam, cb)
         return
     end
 
-    local user = VORPcore.getUser(src)
+    local user = HousingUser(src)
     local character = user and user.getUsedCharacter
     if not user or not character then
         if cbFn then cbFn(false, { error = 'no_character' }) end
@@ -202,8 +202,8 @@ local function handleSellHouseToPlayerWithInventory(src, houseIdParam, targetPla
         return
     end
 
-    local user = VORPcore.getUser(src)
-    local targetUser = VORPcore.getUser(targetPlayerId)
+    local user = HousingUser(src)
+    local targetUser = HousingUser(targetPlayerId)
     if not user or not targetUser then
         NotifyClient(src, _U('houseNotOwnedOrExist'), 4000, 'error')
         if cbFn then cbFn(false) end
@@ -319,8 +319,8 @@ local function handleSellHouseToPlayerWithoutInventory(src, houseIdParam, target
         return
     end
 
-    local user = VORPcore.getUser(src)
-    local targetUser = VORPcore.getUser(targetPlayerId)
+    local user = HousingUser(src)
+    local targetUser = HousingUser(targetPlayerId)
     if not user or not targetUser then
         NotifyClient(src, _U('noHouseOrNotOwner'), 4000, 'error')
         if cbFn then cbFn(false) end
@@ -411,7 +411,7 @@ HousingRPC:Register('bcc-housing:sellHouseToPlayerWithoutInventory', function(pa
 end)
 
 HousingRPC:Register('bcc-housing:RequestSoldHouses', function(params, cb, src)
-    local user = VORPcore.getUser(src)
+    local user = HousingUser(src)
     if not user then return cb(false) end
 
     local character = user.getUsedCharacter
@@ -434,7 +434,7 @@ end)
 -- Event to collect house sale money from an NPC
 local function handleCollectHouseSaleMoney(src, cb)
     local cbFn = type(cb) == 'function' and cb or nil
-    local user = VORPcore.getUser(src)
+    local user = HousingUser(src)
     if not user then
         if cbFn then cbFn(false, { error = 'no_user' }) end
         return

@@ -1,5 +1,5 @@
 HousingRPC:Register('bcc-housing:CheckIfAdmin', function(params, cb, src)
-    local user = VORPcore.getUser(src)
+    local user = HousingUser(src)
     if not user then return cb(false) end
 
     local character = user.getUsedCharacter
@@ -18,7 +18,7 @@ end)
 
 HousingRPC:Register('bcc-housing:CheckJob', function(params, cb, src)
     local location = params and params.location
-    local user = VORPcore.getUser(src)
+    local user = HousingUser(src)
     if not user or not location then return cb(false) end
 
     local character = user.getUsedCharacter
@@ -40,4 +40,3 @@ HousingRPC:Register('bcc-housing:CheckJob', function(params, cb, src)
 end)
 
 -- Check for version updates
-BccUtils.Versioner.checkFile(GetCurrentResourceName(), "https://github.com/BryceCanyonCounty/bcc-housing")

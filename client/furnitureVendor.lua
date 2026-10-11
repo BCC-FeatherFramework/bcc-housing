@@ -88,7 +88,7 @@ CreateThread(function()
         return
     end
 
-    local vendorPromptGroup = BccUtils.Prompts:SetupPromptGroup()
+    local vendorPromptGroup = HousingPrompts:SetupPromptGroup()
     local vendorPrompt = vendorPromptGroup:RegisterPrompt(_U('furnitureVendorPrompt'), HousingKeys[Config.keys.buy],
         1, 1, true, 'click', nil)
 
@@ -129,11 +129,11 @@ CreateThread(function()
         for i, coord in ipairs(coordsList) do
             if vendor.blip and (vendor.blip.show == nil or vendor.blip.show) then
                 local label = vendor.blip.label or vendor.blip.name or vendor.name or _U('furnitureVendorTitle')
-                local blipWrapper = BccUtils.Blips:SetBlip(label, vendor.blip.sprite, vendor.blip.scale or 0.2,
+                local blipWrapper = HousingBlips:SetBlip(label, vendor.blip.sprite, vendor.blip.scale or 0.2,
                     coord.x, coord.y, coord.z)
                 if blipWrapper then
                     if vendor.blip.color and Config.BlipColors and Config.BlipColors[vendor.blip.color] then
-                        local modifier = BccUtils.Blips:AddBlipModifier(blipWrapper, Config.BlipColors[vendor.blip.color])
+                        local modifier = HousingBlips:AddBlipModifier(blipWrapper, Config.BlipColors[vendor.blip.color])
                         if modifier and modifier.ApplyModifier then
                             modifier:ApplyModifier()
                         end
@@ -146,7 +146,7 @@ CreateThread(function()
         for i, coord in ipairs(coordsList) do
             if vendor.npc and isNpcEnabled(vendor.npc) then
                 removeExistingVendorPed(coord, vendor.npc.model)
-                local pedWrapper = BccUtils.Ped:Create(
+                local pedWrapper = HousingPed:Create(
                     vendor.npc.model,
                     coord.x, coord.y, coord.z + (vendor.npc.zOffset or -1.0),
                     headingList[i] or (vendor.npc.heading or 0.0),

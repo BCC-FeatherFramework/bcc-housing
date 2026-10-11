@@ -1,15 +1,12 @@
 ---- Pulling Essentials -----
-VORPcore    = exports.vorp_core:GetCore()
 DoorLocksAPI = exports['bcc-doorlocks']:getDoorLocksAPI()
-
-Discord = BccUtils.Discord.setup(Config.WebhookLink, Config.WebhookTitle, Config.WebhookAvatar)
 
 DbUpdated = false -- Use this to stop taxes from running till db has been made
 BCCHousingResourceStopping = false
 
+-- The player's active character from their Core session (see server/feather/init.lua).
 function GetHousingCharacter(src)
-    local user = VORPcore.getUser(src)
-    return user and user.getUsedCharacter or nil
+    return HousingCharacters.Get(src)
 end
 
 function IsHousingAdmin(src)
@@ -70,20 +67,13 @@ HousingRPC:Register('bcc-housing:GetPlayers', function(params, cb, src)
 
     if players and #players > 0 then
         for _, playerId in ipairs(players) do
-            local User = VORPcore.getUser(playerId)
-            if User then
-                local Character = User.getUsedCharacter -- Calling the method correctly
-                if Character then
-                    -- Check if firstname and lastname are not nil and provide default values if they are
-                    local firstname = Character.firstname or "Unknown"
-                    local lastname = Character.lastname or "Player"
-                    local playerName = firstname .. ' ' .. lastname
-                    table.insert(data, {
-                        serverId = playerId,
-                        PlayerName = playerName,
-                        staticid = Character.charIdentifier,
-                    })
-                end
+            local Character = HousingCharacters.Get(playerId)
+            if Character then
+                table.insert(data, {
+                    serverId = playerId,
+                    PlayerName = Character.firstname .. ' ' .. Character.lastname,
+                    staticid = Character.charIdentifier,
+                })
             end
         end
     else
@@ -133,16 +123,16 @@ function NotifyClient(src, message, durationOrType, maybeDuration)
         duration = defaultDuration
     end
 
-    if Config.Notify == "feather-menu" then
-        HousingRPC:Notify("bcc-housing:NotifyClient", {
-            message = message,
-            type = notifyType,
-            duration = duration
-        }, src)
-    elseif Config.Notify == "vorp-core" then
-        VORPcore.NotifyRightTip(src, message, duration)
-    else
-        DBG:Warning("^1[Notify] Invalid Config.Notify: " .. tostring(Config.Notify))
+    if not src or tonumber(src) == 0 then return end
+    -- feather-notify through Core; the type only picks the log level here.
+    local result = exports['feather-core']:SendNotification({
+        source = tonumber(src),
+        style = Config.NotifyStyle or 'right',
+        message = tostring(message),
+        duration = tonumber(duration) or defaultDuration
+    })
+    if type(result) ~= 'table' or result.ok ~= true then
+        DBG:Error('[NotifyClient] failed', type(result) == 'table' and result.code or 'invalid_result', notifyType)
     end
 end
 

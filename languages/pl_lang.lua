@@ -1,5 +1,5 @@
 ---------------------------------- POLISH -------------------------------------------
-Locales["pl_lang"] = {
+Feather.Locale.register("pl", {
     doorId = 'ID Drzwi: ',
     creationMenuName = 'Mieszkalnictwo',
     setInvLimit = 'Limit Ekwipunku',
@@ -442,4 +442,4 @@ Locales["pl_lang"] = {
     doorSaveFailed = "Failed to save door.",
     doorRemoveFailed = "Failed to remove door.",
     switchTab = "Zmień zakładkę",
-}
+})

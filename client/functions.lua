@@ -1,8 +1,7 @@
 ----- Pulling Essentials -----
-VORPcore = exports.vorp_core:GetCore()
-
-FeatherMenu = exports["feather-menu"].initiate()
-MiniGame = exports["bcc-minigames"].initiate()
+-- feather-menu-v2 through the compatibility layer in client/feather/menu_v2.lua,
+-- so the existing v1-style menu code keeps working unchanged.
+FeatherMenu = FeatherMenuV2Compat
 
 HousingInstance = {}
 
@@ -100,9 +99,11 @@ local function getPolyPointZRange(points)
     return minZ, maxZ
 end
 
+-- PolyZone is optional (it is not part of Feather). Without it, house areas use
+-- the built-in polygon check in IsPointInsideHousingArea.
 function CreateHousingPolyZone(name, points, minZ, maxZ, debugPoly)
     local normalized = normalizePolyPoints(points)
-    if not normalized then
+    if not normalized or PolyZone == nil then
         return nil
     end
 
@@ -142,6 +143,18 @@ function IsPointInsideHousingArea(areaContext, point)
 
     if areaContext.zone and areaContext.zone.isPointInside then
         return areaContext.zone:isPointInside(point)
+    end
+
+    -- No PolyZone: the same polygon in X/Y, bounded by the configured floor and ceiling.
+    local polygon = NormalizeHousingPolyPoints(areaContext.polyPoints)
+    if polygon then
+        if not isPointInsidePolyXY(polygon, point) then
+            return false
+        end
+        local minZ, maxZ = tonumber(areaContext.polyMinZ), tonumber(areaContext.polyMaxZ)
+        if minZ and point.z < minZ - 2.0 then return false end
+        if maxZ and point.z > maxZ + 2.0 then return false end
+        return true
     end
 
     local coords = areaContext.coords
@@ -240,10 +253,10 @@ function RemoveManagePrompt(houseId)
     end
 end
 
-function Notify(message, typeOrDuration, maybeDuration, overrides)
-    overrides = overrides or {}
+-- Notifications through feather-notify. The type is kept for the debug log only;
+-- feather-notify styles are configured with Config.NotifyStyle.
+function Notify(message, typeOrDuration, maybeDuration)
     local opts = Config.NotifyOptions or {}
-
     local notifyType = opts.type or "info"
     local notifyDuration = opts.autoClose or 4000
 
@@ -254,33 +267,13 @@ function Notify(message, typeOrDuration, maybeDuration, overrides)
         notifyDuration = typeOrDuration
     end
 
-    local notifyPosition = overrides.position or opts.position or "bottom-center"
-    local notifyTransition = overrides.transition or opts.transition or "slide"
-    local notifyIcon = overrides.icon
-    if notifyIcon == nil then notifyIcon = opts.icon end
-    local hideProgressBar = overrides.hideProgressBar
-    if hideProgressBar == nil then hideProgressBar = opts.hideProgressBar end
-    local rtl = overrides.rtl
-    if rtl == nil then rtl = opts.rtl end
-
-    if Config.Notify == "feather-menu" then
-        FeatherMenu:Notify({
-            message = message,
-            type = notifyType,
-            autoClose = notifyDuration,
-            position = notifyPosition,
-            transition = notifyTransition,
-            icon = notifyIcon,
-            hideProgressBar = hideProgressBar,
-            rtl = rtl or false,
-            style = overrides.style or opts.style or {},
-            toastStyle = overrides.toastStyle or opts.toastStyle or {},
-            progressStyle = overrides.progressStyle or opts.progressStyle or {}
-        })
-    elseif Config.Notify == "vorp-core" then
-        VORPcore.NotifyRightTip(message, notifyDuration)
-    else
-        DBG:Info("^1[Notify] Invalid Config.Notify: " .. tostring(Config.Notify))
+    local result = exports['feather-notify']:ShowNotification({
+        style = Config.NotifyStyle or 'right',
+        message = tostring(message),
+        duration = notifyDuration
+    })
+    if type(result) ~= 'table' or result.ok ~= true then
+        DBG:Warning('[Notify] failed', type(result) == 'table' and result.code or 'invalid_result', notifyType)
     end
 end
 
@@ -345,7 +338,7 @@ end
 function showManageOpt(x, y, z, houseId, houseContext)
     RemoveManagePrompt(houseId)
 
-    local promptGroup = BccUtils.Prompts:SetupPromptGroup()
+    local promptGroup = HousingPrompts:SetupPromptGroup()
     local promptHandle = promptGroup:RegisterPrompt(_U("openOwnerManage"), HousingKeys[Config.keys.manage], 1, 1, true, 'click', nil)
     local radiusValue = 2.0
     ManageHousePrompts[houseId] = {
@@ -482,7 +475,7 @@ AddEventHandler("onClientResourceStop", function(resource)
         if HouseBlips and next(HouseBlips) then
             for k, v in pairs(HouseBlips) do
                 if v and v.rawblip then
-                    BccUtils.Blips:RemoveBlip(v.rawblip)
+                    HousingBlips:RemoveBlip(v.rawblip)
                 end
             end
             HouseBlips = {}
@@ -502,7 +495,7 @@ AddEventHandler("onClientResourceStop", function(resource)
         if HotelBlips and next(HotelBlips) then
             for k, v in pairs(HotelBlips) do
                 if v and v.rawblip then
-                    BccUtils.Blips:RemoveBlip(v.rawblip)
+                    HousingBlips:RemoveBlip(v.rawblip)
                 end
             end
             HotelBlips = {}

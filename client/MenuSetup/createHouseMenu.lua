@@ -91,7 +91,8 @@ end
 local function refreshHousingPolyPreview()
     cleanupHousingPolyPreview()
     ensurePolyState()
-    if #globalHouseData.polyPoints < 3 then
+    -- The outline is drawn only when the optional PolyZone resource is running.
+    if #globalHouseData.polyPoints < 3 or PolyZone == nil then
         return
     end
 
@@ -211,7 +212,7 @@ end
 local function getHousingPolyKeyCode(keyName, fallback)
     if not keyName or keyName == '' then return fallback end
     keyName = keyName:upper()
-    return (BccUtils.Keys and HousingKeys[keyName]) or fallback
+    return HousingKeys[keyName] or fallback
 end
 
 local function deleteHousingPolyPrompts()
@@ -225,7 +226,7 @@ end
 
 local function ensureHousingPolyPromptGroup()
     if housingPolyPrompts.group then return end
-    housingPolyPrompts.group = BccUtils.Prompts:SetupPromptGroup()
+    housingPolyPrompts.group = HousingPrompts:SetupPromptGroup()
     housingPolyPrompts.add = housingPolyPrompts.group:RegisterPrompt('Add point', getHousingPolyKeyCode(Config.HousingPolyPointPromptKey, 0xE30CD707), 1, 1, true, 'click', { tabIndex = 0 })
     housingPolyPrompts.undo = housingPolyPrompts.group:RegisterPrompt('Undo last point', getHousingPolyKeyCode(Config.HousingPolyUndoPromptKey, 0x156F7119), 1, 1, true, 'click', { tabIndex = 1 })
     housingPolyPrompts.save = housingPolyPrompts.group:RegisterPrompt('Save polyzone', getHousingPolyKeyCode(Config.HousingPolySavePromptKey, 0xC7B5340A), 1, 1, true, 'click', { tabIndex = 2 })

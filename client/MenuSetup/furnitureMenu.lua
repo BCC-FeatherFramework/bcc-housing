@@ -312,7 +312,7 @@ local function SpawnVendorItemAtCam(item)
     DBG:Info("SpawnVendorItemAtCam: model to spawn: " .. tostring(model))
 
     DBG:Info("SpawnVendorItemAtCam: attempting object create...")
-    local obj = BccUtils.Objects:Create(
+    local obj = HousingObjects:Create(
         model,
         cam.x, cam.y, cam.z,
         cam.h or 0.0,
@@ -1148,8 +1148,8 @@ function PlaceFurnitureIntoWorldPrompt(itemData)
         return
     end
 
-    -- Use BccUtils Objects wrapper, but resolve actual entity for native calls
-    local createdWrapper = BccUtils.Objects:Create(
+    -- Create through feather-toolkit (client/feather/toolkit.lua), then use the entity for native calls
+    local createdWrapper = HousingObjects:Create(
         model,
         placementCoords.x,
         placementCoords.y + 1,

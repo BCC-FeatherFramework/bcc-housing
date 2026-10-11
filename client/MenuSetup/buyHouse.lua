@@ -45,16 +45,16 @@ local function refreshHouseSaleBlips()
         local existingBlip = HouseBlips[house.uniqueName]
 
         if isPurchased and existingBlip then
-            BccUtils.Blips:RemoveBlip(existingBlip.rawblip)
+            HousingBlips:RemoveBlip(existingBlip.rawblip)
             HouseBlips[house.uniqueName] = nil
         elseif not isPurchased and house.blip.sale.active and not existingBlip then
-            local houseSaleBlip = BccUtils.Blips:SetBlip(
+            local houseSaleBlip = HousingBlips:SetBlip(
                 house.blip.sale.name, house.blip.sale.sprite, 0.2,
                 house.menuCoords.x, house.menuCoords.y, house.menuCoords.z
             )
             HouseBlips[house.uniqueName] = houseSaleBlip
 
-            local blipModifier = BccUtils.Blips:AddBlipModifier(
+            local blipModifier = HousingBlips:AddBlipModifier(
                 houseSaleBlip,
                 Config.BlipColors[house.blip.sale.color]
             )
@@ -126,7 +126,7 @@ local function ensureHousePreviewPrompt()
         return
     end
 
-    housePreviewPromptGroup = BccUtils.Prompt:SetupPromptGroup()
+    housePreviewPromptGroup = HousingPrompts:SetupPromptGroup()
     housePreviewClosePrompt = housePreviewPromptGroup:RegisterPrompt(
         _U("closePropertyPreview"),
         HousingKeys[Config.keys.cancel],
@@ -147,7 +147,8 @@ function StartHouseAreaPreview(house)
     stopHouseAreaPreview()
     ensureHousePreviewPrompt()
     housePreviewState.house = house
-    if house and type(house.polyPoints) == 'table' and #house.polyPoints >= 3 then
+    -- The outline is drawn only when the optional PolyZone resource is running.
+    if PolyZone ~= nil and house and type(house.polyPoints) == 'table' and #house.polyPoints >= 3 then
         local vectors = {}
         for _, point in ipairs(house.polyPoints) do
             vectors[#vectors + 1] = vector2(point.x, point.y)
@@ -267,7 +268,7 @@ CreateThread(function()
     end
     rebuildPurchasedHouseLookup()
 
-    local PromptGroup = BccUtils.Prompt:SetupPromptGroup()
+    local PromptGroup = HousingPrompts:SetupPromptGroup()
     local BuyHousePrompt = PromptGroup:RegisterPrompt(
         _U("moreInfo"),
         HousingKeys[Config.keys.buy],

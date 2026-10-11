@@ -49,7 +49,7 @@ local function handleHousePurchase(src, houseCoords, moneyTypeParam, cb)
         return
     end
 
-    local user = VORPcore.getUser(src)
+    local user = HousingUser(src)
     if not user then
         if cbFn then cbFn(false, { error = 'no_user' }) end
         return

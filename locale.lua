@@ -1,47 +1,35 @@
-Locales = {}
+-- Translations are owned by feather-core. Core's locale table is shared by every
+-- resource and the first registration of a key wins, so bcc-housing registers
+-- each key as "bcc-housing.<key>". Call sites keep using _("key") / _U("key").
+Feather = Feather or {}
+Feather.Locale = Feather.Locale or {}
 
-local translationCache = {} -- Cache for translations
+local PREFIX = 'bcc-housing.'
 
-local function hasArgs(...)
-    return select('#', ...) > 0
+function Feather.Locale.register(locale, translations)
+    local prefixed = {}
+    for key, value in pairs(translations) do prefixed[PREFIX .. key] = value end
+    local result = exports['feather-core']:RegisterLocale(locale, prefixed)
+    if type(result) ~= 'table' or result.ok ~= true then
+        error(('[bcc-housing] locale registration failed for %s: %s'):format(
+            tostring(locale), tostring(type(result) == 'table' and result.code or 'invalid_result')))
+    end
+    return result
+end
+
+function Feather.Locale.translate(key, ...)
+    local result = exports['feather-core']:TranslateLocale(0, PREFIX .. key, ...)
+    if type(result) == 'table' and result.ok == true and type(result.value) == 'string' then
+        return result.value
+    end
+    return tostring(key)
 end
 
 function _(str, ...) -- Translate string
-    local cache = translationCache[str]
-    if cache then
-        if hasArgs(...) then
-            return string.format(cache, ...)
-        end
-        return cache
-    end
-
-    local lang = Config.defaultlang
-    local defaultLang = "en_lang" -- Set your fallback language here (e.g., 'en')
-
-    if Locales[lang] ~= nil then
-        if Locales[lang][str] ~= nil then
-            translationCache[str] = Locales[lang][str] -- Cache the translation for faster future access
-            if hasArgs(...) then
-                return string.format(Locales[lang][str], ...)
-            else
-                return Locales[lang][str]
-            end
-        elseif Locales[defaultLang] ~= nil and Locales[defaultLang][str] ~= nil then
-            if hasArgs(...) then
-                return string.format(Locales[defaultLang][str], ...)
-            else
-                return Locales[defaultLang][str]
-            end
-        else
-            return 'Translation [' .. lang .. '][' .. str .. '] and fallback [' .. defaultLang .. '] do not exist'
-        end
-    else
-        return 'Locale [' .. lang .. '] does not exist'
-    end
+    return Feather.Locale.translate(str, ...)
 end
 
 function _U(str, ...) -- Translate string first char uppercase
-    -- Use cached translation if available
     local translation = _(str, ...)
     return translation:sub(1, 1):upper() .. translation:sub(2)
 end

@@ -32,7 +32,7 @@ local function ownsHotel(charId, hotelId)
 end
 
 HousingRPC:Register('bcc-housing:HotelDbRegistry', function(params, cb, src)
-    local user = VORPcore.getUser(src)
+    local user = HousingUser(src)
     if not user then if cb then cb(false) end return end
 
     local character = user.getUsedCharacter
@@ -63,7 +63,7 @@ end)
 HousingRPC:Register('bcc-housing:HotelBought', function(params, cb, src)
     local requestedHotel = params and params.hotel
     local hotelTable = findHotelConfig(requestedHotel and requestedHotel.hotelId)
-    local user = VORPcore.getUser(src)
+    local user = HousingUser(src)
     if not user then if cb then cb(false) end return end
 
     local character = user.getUsedCharacter
@@ -105,7 +105,7 @@ end)
 
 HousingRPC:Register('bcc-housing:RegisterHotelInventory', function(params, cb, src)
     local hotelId = params and params.hotelId
-    local user = VORPcore.getUser(src)
+    local user = HousingUser(src)
     if not user then if cb then cb(false) end return end
 
     local character = user.getUsedCharacter
@@ -144,7 +144,7 @@ end)
 
 HousingRPC:Register('bcc-housing:HotelInvOpen', function(params, cb, src)
     local hotelId = params and params.hotelId
-    local user = VORPcore.getUser(src)
+    local user = HousingUser(src)
     if not user then if cb then cb(false) end return end
 
     local character = user.getUsedCharacter
