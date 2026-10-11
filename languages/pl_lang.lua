@@ -443,4 +443,7 @@ Feather.Locale.register("pl", {
     doorRemoveFailed = "Failed to remove door.",
     switchTab = "Zmień zakładkę",
     houseCreateFailed = "Nie udało się utworzyć domu.",
+    transactionFailed = "Nie udało się dokonać płatności. Spróbuj ponownie.",
+    currencyNotSupported = "Ta cena używa waluty, której serwer nie obsługuje.",
+    noGold = "Za mało złota",
 })

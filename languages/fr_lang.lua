@@ -442,4 +442,7 @@ Feather.Locale.register("fr", {
     freeHouseBlipsHidden = "Free house blips have been hidden.",
     freeHouseBlipsShown = "Free house blips are now visible.",
     houseCreateFailed = "Impossible de créer la maison.",
+    transactionFailed = "Le paiement n'a pas pu être effectué. Réessayez.",
+    currencyNotSupported = "Ce prix utilise une devise que le serveur ne prend pas en charge.",
+    noGold = "Pas assez d'or",
 })

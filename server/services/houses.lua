@@ -638,7 +638,7 @@ HousingRPC:Register('bcc-housing:UpgradeInventory', function(params, cb, src)
     end
 
     local row = result[1]
-    if tostring(row.charidentifier) ~= tostring(character.charIdentifier) then
+    if not IsHouseOwner(src, houseId) then
         NotifyClient(src, _U('noAccessToHouse'), 4000, 'error')
         if cb then cb(false) end
         return
@@ -652,13 +652,29 @@ HousingRPC:Register('bcc-housing:UpgradeInventory', function(params, cb, src)
     end
 
     local stageCost = tonumber(nextStage.cost) or 0
-    if character.money < stageCost then
+    if stageCost > 0 and not HousingEconomy.HasFunds(character.charIdentifier, 'dollars', stageCost) then
         if cb then cb(false, { error = 'notEnoughCash' }) end
         return
     end
 
-    character.removeCurrency(0, stageCost)
-    DB.exec("UPDATE bcchousing SET inventory_current_stage = ? WHERE houseid = ?", nextStage.stage, houseId)
+    -- Claim the stage first so two requests cannot both pay for it.
+    local claimed = DB.exec("UPDATE bcchousing SET inventory_current_stage = ? WHERE houseid = ? AND inventory_current_stage = ?",
+        nextStage.stage, houseId, currentStage)
+    if tonumber(claimed) ~= 1 then
+        if cb then cb(false, { error = 'invalid_stage' }) end
+        return
+    end
+    if stageCost > 0 then
+        local paid = HousingEconomy.Pay(character, 'dollars', stageCost, 'housing.storage_upgrade',
+            { type = 'housing_house', id = houseId }, ('housing:storage:%s:%s'):format(houseId, nextStage.stage))
+        if not paid.ok then
+            DB.exec("UPDATE bcchousing SET inventory_current_stage = ? WHERE houseid = ? AND inventory_current_stage = ?",
+                currentStage, houseId, nextStage.stage)
+            NotifyClient(src, _U(HousingEconomy.MessageKey(paid, 'dollars')), 4000, 'error')
+            if cb then cb(false, { error = paid.code }) end
+            return
+        end
+    end
 
     local finalLimit = select(1, calculateFinalInventoryLimit(row.invlimit, row.ownershipStatus, nextStage.stage))
     ensureHouseInventoryRegistered(houseId, {

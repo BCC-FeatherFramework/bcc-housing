@@ -255,6 +255,31 @@ function HousingProperty.Release(propertyKey, requestId, actorSource, reasonCode
     return Housing.Ok({ propertyId = snapshot.value.propertyId, ended = #interests, revision = revision })
 end
 
+-- Ends one character's interest(s) on a property (a hotel guest leaves, or a
+-- failed hotel payment is undone). Other holders are untouched.
+function HousingProperty.EndHolder(propertyKey, characterId, requestId, actorSource, reasonCode)
+    local snapshot = HousingProperty.Get(propertyKey)
+    if not snapshot.ok then return snapshot end
+    local revision = snapshot.value.revision
+    for _, list in ipairs({ snapshot.value.owners, snapshot.value.tenants }) do
+        for _, interest in ipairs(list) do
+            if interest.holderType == 'character' and interest.holderId == characterId then
+                local ended = call('EndInterest', {
+                    requestId = HousingProperty.RequestId('end', requestId, interest.interestId),
+                    propertyId = snapshot.value.propertyId,
+                    expectedRevision = revision,
+                    interestId = interest.interestId,
+                    reasonCode = reasonCode or 'housing.release',
+                    actorSource = actorSource
+                })
+                if not ended.ok then return ended end
+                revision = ended.value.revision
+            end
+        end
+    end
+    return Housing.Ok({ propertyId = snapshot.value.propertyId, revision = revision })
+end
+
 -- Retires a custom house for good (its interests end in the same commit).
 function HousingProperty.Retire(propertyKey, requestId, actorSource)
     local snapshot = HousingProperty.Get(propertyKey)

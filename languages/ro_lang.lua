@@ -448,4 +448,7 @@ Feather.Locale.register("ro", {
     freeHouseBlipsHidden = "Blipurile caselor libere au fost ascunse.",
     freeHouseBlipsShown = "Blipurile caselor libere sunt acum vizibile.",
     houseCreateFailed = "Crearea casei a eșuat.",
+    transactionFailed = "Plata nu a putut fi efectuată. Încearcă din nou.",
+    currencyNotSupported = "Acest preț folosește o monedă pe care serverul nu o acceptă.",
+    noGold = "Nu ai destul aur",
 })

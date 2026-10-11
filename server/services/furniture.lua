@@ -367,7 +367,19 @@ HousingRPC:Register('bcc-housing:FurnSoldRemoveFromTable', function(params, cb, 
         return
     end
 
-    character.addCurrency(0, sellPrice)
+    -- The agent buys it back: new money in the wallet (policy-gated supply).
+    if sellPrice > 0 then
+        local paid = HousingEconomy.Issue(character.charIdentifier, 'dollars', sellPrice, 'housing.furniture_sold',
+            { type = 'housing_house', id = houseId }, 'housing:furniture-sell:' .. Housing.NewId())
+        if not paid.ok then
+            -- Put the furniture back so nothing is lost.
+            DB.exec("UPDATE bcchousing SET furniture = ? WHERE houseid = ? AND furniture = ?",
+                houseData.furniture, houseId, updatedFurniture)
+            NotifyClient(src, _U("furnNotSold"), 4000, "error")
+            if cb then cb(false) end
+            return
+        end
+    end
     NotifyClient(src, _U("furnSold"), 4000, "success")
     Discord:sendMessage(_U("furnWebHookSold") ..
         character.charIdentifier ..
@@ -499,20 +511,19 @@ HousingRPC:Register("bcc-housing:PurchaseFurnitureItem", function(params, cb, sr
         return cb(false)
     end
 
-    if character.money < cost then
-        DBG:Info("bcc-housing: " ..
-        tostring(src) ..
-        " tried to buy " .. tostring(furnItem.displayName) .. " but lacks money (needs " .. tostring(cost) .. ")")
-        return cb(false)
-    end
-
-    character.removeCurrency(0, cost)
-    local ownedItems = loadOwnedFurniture(character.charIdentifier)
     local modelName = furnItem.propModel or furnItem.model
     if not modelName then
         DBG:Info("bcc-housing: furniture item missing model definition for " .. tostring(furnItem.displayName))
         return cb(false)
     end
+
+    local paid = HousingEconomy.Pay(character, 'dollars', cost, 'housing.furniture',
+        { type = 'housing_furniture', id = modelName }, 'housing:furniture-buy:' .. Housing.NewId())
+    if not paid.ok then
+        NotifyClient(src, _U(HousingEconomy.MessageKey(paid, 'dollars')), 4000, "error")
+        return cb(false)
+    end
+    local ownedItems = loadOwnedFurniture(character.charIdentifier)
 
     local entry = {
         id          = generateFurnitureId(),

@@ -445,4 +445,7 @@ Feather.Locale.register("uk", {
     freeHouseBlipsHidden = "Free house blips have been hidden.",
     freeHouseBlipsShown = "Free house blips are now visible.",
     houseCreateFailed = "Не вдалося створити будинок.",
+    transactionFailed = "Не вдалося здійснити платіж. Спробуйте ще раз.",
+    currencyNotSupported = "Ця ціна використовує валюту, яку сервер не підтримує.",
+    noGold = "Недостатньо золота",
 })

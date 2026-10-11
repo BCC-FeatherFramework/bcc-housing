@@ -104,26 +104,20 @@ local function handleHousePurchase(src, houseCoords, moneyTypeParam, cb)
     if configuredCurrency ~= 0 and configuredCurrency ~= 1 and configuredCurrency ~= 2 then
         configuredCurrency = 0
     end
+    -- 2 (Rol tokens) is refused below: Feather Economy has dollars and gold only.
 
     local currencyType = configuredCurrency
 
-    local moneyAmount = isRental and selectedHouse.rentalDeposit or selectedHouse.price
-    local hasFunds
-    if currencyType == 0 then
-        hasFunds = character.money >= moneyAmount
-    elseif currencyType == 1 then
-        hasFunds = character.gold >= moneyAmount
-    else
-        hasFunds = (tonumber(character.rol) or 0) >= moneyAmount
+    local moneyAmount = tonumber(isRental and selectedHouse.rentalDeposit or selectedHouse.price) or 0
+    local currency = HousingEconomy.Currency(currencyType)
+    if not currency then
+        NotifyClient(src, _U('currencyNotSupported'), 4000, 'error')
+        if cbFn then cbFn(false, { error = 'currency_not_supported' }) end
+        return
     end
-    if not hasFunds then
-        if currencyType == 0 then
-            NotifyClient(src, _U('notEnoughMoney'), 4000, 'error')
-        elseif currencyType == 1 then
-            NotifyClient(src, _U('notEnoughGold'), 4000, 'error')
-        else
-            NotifyClient(src, _U('notEnoughRol'), 4000, 'error')
-        end
+    -- Early check for a friendly message; the payment itself is what decides.
+    if moneyAmount > 0 and not HousingEconomy.HasFunds(character.charIdentifier, currency, moneyAmount) then
+        NotifyClient(src, _U(currency == 'gold' and 'notEnoughGold' or 'notEnoughMoney'), 4000, 'error')
         if cbFn then cbFn(false) end
         return
     end
@@ -181,7 +175,21 @@ local function handleHousePurchase(src, houseCoords, moneyTypeParam, cb)
         return
     end
 
-    character.removeCurrency(currencyType, moneyAmount)
+    -- Payment last, so a failed payment only has to undo the row and the ownership.
+    if moneyAmount > 0 then
+        local paid = HousingEconomy.Pay(character, currency, moneyAmount,
+            isRental and 'housing.rent_deposit' or 'housing.purchase',
+            { type = 'housing_house', id = houseId }, 'housing:purchase:' .. purchaseId)
+        if not paid.ok then
+            DB.exec('DELETE FROM bcchousing WHERE houseid = ?', houseId)
+            HousingProperty.Release(propertyKey, HousingProperty.RequestId('purchase-undo', purchaseId), src, 'housing.purchase_failed')
+            NotifyClient(src, _U(HousingEconomy.MessageKey(paid, currency,
+                currency == 'gold' and 'notEnoughGold' or 'notEnoughMoney')), 4000, 'error')
+            if cbFn then cbFn(false, { error = paid.code }) end
+            return
+        end
+    end
+
     insertHouseDoors(selectedHouse.doors, character.charIdentifier, houseId, selectedHouse.uniqueName)
     GiveHousePropertyDocument(src, character, selectedHouse, houseId, ownershipStatus)
 
@@ -189,12 +197,10 @@ local function handleHousePurchase(src, houseCoords, moneyTypeParam, cb)
     HousingRPC:Notify('bcc-housing:housePurchased', { houseCoords = coordsToPayload(selectedHouse.houseCoords) }, src)
 
     local displayAmount
-    if currencyType == 0 then
+    if currency == 'dollars' then
         displayAmount = '$' .. tostring(moneyAmount)
-    elseif currencyType == 1 then
-        displayAmount = tostring(moneyAmount) .. ' ' .. _U('currencyGold')
     else
-        displayAmount = tostring(moneyAmount) .. ' ' .. _U('currencyRol')
+        displayAmount = tostring(moneyAmount) .. ' ' .. _U('currencyGold')
     end
 
     if ownershipStatus == 'purchased' then

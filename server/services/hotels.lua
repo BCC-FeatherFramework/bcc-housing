@@ -86,29 +86,39 @@ HousingRPC:Register('bcc-housing:HotelBought', function(params, cb, src)
         return
     end
 
-    if character.money < hotelCost then
+    if not HousingEconomy.HasFunds(charId, 'dollars', hotelCost) then
         NotifyClient(src, _U('noMoney'), 4000, "error")
         if cb then cb(false) end
         return
     end
 
     -- The room is a tenant interest on the hotel's property in feather-property.
-    local tenancy = HousingProperty.AddTenant(HousingProperty.HotelKey(hotelTable.hotelId), charId,
-        HousingProperty.RequestId('hotel', hotelTable.hotelId, charId), src, 'housing.hotel')
-    if not tenancy.ok and tenancy.code ~= 'interest_exists' then
+    -- One ID per attempt: a failed payment ends the tenancy, and a retry must not
+    -- replay the old (ended) grant.
+    local attemptId = Housing.NewId()
+    local hotelKey = HousingProperty.HotelKey(hotelTable.hotelId)
+    local tenancy = HousingProperty.AddTenant(hotelKey, charId,
+        HousingProperty.RequestId('hotel', hotelTable.hotelId, attemptId), src, 'housing.hotel')
+    if not tenancy.ok then
         DBG:Error('[HotelBought] property failed', tenancy.code, tenancy.message)
-        NotifyClient(src, _U('hotelAlreadyOwned'), 4000, 'error')
+        NotifyClient(src, _U(tenancy.code == 'interest_exists' and 'hotelAlreadyOwned' or 'transactionFailed'), 4000, 'error')
         if cb then cb(false) end
         return
     end
-    DB.exec('INSERT INTO `bcchousinghotels` (`charidentifier`, `hotels`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `charidentifier` = VALUES(`charidentifier`)', charId, 'none')
+
+    local paid = HousingEconomy.Pay(character, 'dollars', hotelCost, 'housing.hotel',
+        { type = 'housing_hotel', id = hotelTable.hotelId }, 'housing:hotel:' .. attemptId)
+    if not paid.ok then
+        HousingProperty.EndHolder(hotelKey, charId, HousingProperty.RequestId('hotel-undo', attemptId), src, 'housing.purchase_failed')
+        NotifyClient(src, _U(HousingEconomy.MessageKey(paid, 'dollars')), 4000, 'error')
+        if cb then cb(false) end
+        return
+    end
 
     local ownedHotelsTable = loadOwnedHotels(charId)
     table.insert(ownedHotelsTable, hotelTable.hotelId)
-    local updatedHotels = json.encode(ownedHotelsTable)
-
-    character.removeCurrency(0, hotelCost)
-    DB.exec('UPDATE `bcchousinghotels` SET `hotels` = ? WHERE `charidentifier` = ?', updatedHotels, charId)
+    DB.exec('INSERT INTO `bcchousinghotels` (`charidentifier`, `hotels`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `hotels` = VALUES(`hotels`)',
+        charId, json.encode(ownedHotelsTable))
 
     if cb then cb(true, ownedHotelsTable) end
 end)
