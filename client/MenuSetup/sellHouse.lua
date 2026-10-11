@@ -272,9 +272,9 @@ function OpenConfirmSellHouseMenu(houseId, targetPlayerId, targetPlayerName, wit
                 targetPlayerId = targetPlayerId,
                 salePrice = salePrice
             })
-            if success then
-                RemoveManagePrompt()
-            else
+            -- Success means the offer was sent; the house changes hands only when the
+            -- buyer accepts (the house list reloads then).
+            if not success then
                 DBG:Info("sellHouseToPlayerWithInventory RPC failed: " .. tostring(err and err.error))
             end
         else
@@ -283,9 +283,7 @@ function OpenConfirmSellHouseMenu(houseId, targetPlayerId, targetPlayerName, wit
                 targetPlayerId = targetPlayerId,
                 salePrice = salePrice
             })
-            if success then
-                RemoveManagePrompt()
-            else
+            if not success then
                 DBG:Info("sellHouseToPlayerWithoutInventory RPC failed: " .. tostring(err and err.error))
             end
         end
@@ -320,3 +318,27 @@ function GetNearbyPlayers()
 
     return nearbyPlayers
 end
+
+-- A player offers to sell us their house: accept (and pay) or decline. Nothing is
+-- charged until we accept.
+HousingRPC:Register('bcc-housing:SaleOffer', function(offer)
+    if type(offer) ~= 'table' or not offer.offerId then return end
+    local offerPage = BCCHousingMenu:RegisterPage('bcc-housing:saleOfferPage')
+    offerPage:RegisterElement('header', { value = _U('saleOfferTitle'), slot = 'header', style = {} })
+    offerPage:RegisterElement('textdisplay', {
+        value = _U('saleOfferText', tostring(offer.seller), tostring(offer.house), tostring(offer.price),
+            _U(offer.withInventory and 'saleWithInventory' or 'saleWithoutInventory'), tonumber(offer.expiresIn) or 60),
+        style = {}
+    })
+    offerPage:RegisterElement('line', { slot = 'footer', style = {} })
+    offerPage:RegisterElement('button', { label = _U('acceptOffer'), slot = 'footer', style = {} }, function()
+        BCCHousingMenu:Close()
+        HousingRPC:Call('bcc-housing:RespondSaleOffer', { offerId = offer.offerId, accept = true })
+    end)
+    offerPage:RegisterElement('button', { label = _U('declineOffer'), slot = 'footer', style = {} }, function()
+        BCCHousingMenu:Close()
+        HousingRPC:Call('bcc-housing:RespondSaleOffer', { offerId = offer.offerId, accept = false })
+    end)
+    offerPage:RegisterElement('bottomline', { slot = 'footer', style = {} })
+    BCCHousingMenu:Open({ startupPage = offerPage })
+end)

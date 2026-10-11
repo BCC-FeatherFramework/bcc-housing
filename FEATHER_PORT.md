@@ -17,7 +17,7 @@ domains that own them; bcc-housing keeps no money and no ownership truth.
 | H1 Foundation | Feather adapters (DBG, RPC, notifications, characters, webhook), feather-toolkit prompts/blips/peds/objects/keys, feather-menu-v2 wrapper, Core locales, Feather character events, manifest on Feather only, PolyZone optional | code complete |
 | H2 Staff and jobs | Authority capability `staff.housing.manage` (role `staff.housing.admin`, `HousingAdminGrant`/`HousingAdminRevoke`) + Feather Admin staff capability; realtor (`Config.Admin.jobs`) and agent shop jobs through feather-jobs `CheckAssignment` | code complete |
 | H3 Property | Configured houses and hotels registered in feather-property on start (`bcc-housing:<uniqueName>`, `bcc-housing:hotel:<hotelId>`); staff-created houses on creation (`bcc-housing:custom:<houseid>`); purchase/rent, sale to player and agent, unrent, staff delete and hotel rooms go through Property interests (one holder per house: owner or tenant); `IsHouseOwner` and hotel checks ask Property; `property_id` link; start-up reconciliation; `HousingPropertyStatus <houseid>` | code complete |
-| H4 Money | Purchase, rent, taxes and rent with a paid-until date (no ledger), sale to player and to the NPC agent, furniture purchase and sell-back, storage upgrades: all through feather-economy | |
+| H4 Money | All money through feather-economy, none kept here: purchase/rent deposit (paid after the house is reserved; undone on failure), hotel rooms, furniture buy and agent buy-back, storage upgrades (stage claimed first), taxes and rent from the wallet on each due date with a `taxes_paid_until` date for months paid ahead (ledger removed; empty wallet = overdue + Property suspended), sale to the agent paid at once through Issue (`bcchousing_transactions` is only a retry queue with idempotency keys), sale between players only after the buyer accepts an offer (Property transfer, then buyer-to-seller payment, transfer undone if payment fails); Rol tokens refused | code complete |
 | H5 Storage and deeds | House and hotel storage as feather-inventory containers; deed as an inventory item with `propertyId` metadata | |
 | H6 Doors, access, instances | Doors through the bcc-doorlocks server API (no direct table writes); guest list kept locally until feather-access; instances through feather-routing (server-chosen) | |
 | H7 Tests and docs | `HousingReleaseSmokeTest`, DevMode live test, README, trust entries, console commands | |
@@ -47,7 +47,7 @@ domains that own them; bcc-housing keeps no money and no ownership truth.
 | feather-authority `config.lua` | `trustedReaders`, `trustedCapabilityRegistrars`, `trustedRoleCreators`, `trustedGrantors`, `trustedAssigners` | H2 (added on the dev server) |
 | feather-jobs `config.lua` | `trustedReaders` | H2 (added on the dev server) |
 | feather-property `config.lua`; feather-admin `configs/service_policy.lua` | `trustedReaders`, `trustedManagers`, `trustedAuditors`; `['feather-property']['bcc-housing']` `property.property.manage`, `property.interest.manage` | H3 (added on the dev server) |
-| feather-economy, feather-admin service policy | readers, provisioners, transactors, suppliers; `economy.currency.issue` (NPC sale) | H4 |
+| feather-economy `config.lua`; feather-admin `configs/service_policy.lua` | `trustedReaders`, `trustedProvisioners`, `trustedTransactors`, `trustedSuppliers`; `['feather-economy']['bcc-housing']['economy.currency.issue']` (agent buy-back, furniture sell-back) | H4 (added on the dev server) |
 - **Holder cache:** `bcchousing.charidentifier` and `bcchousinghotels` only cache the
   holder; feather-property is the truth. On start every configured house and hotel is
   registered and each house row is reconciled (a different holder fixes the cache; a row
@@ -57,6 +57,5 @@ domains that own them; bcc-housing keeps no money and no ownership truth.
   bcc-housing until feather-access exists (the Access master plan defers it).
 - **No VORP data migration:** the development database has no bcc-housing tables; VORP
   numeric character IDs could not be mapped to Feather characters anyway.
-- **To fix in H4:** sale to another player takes the buyer's money without asking them
-  (original behaviour); the buyer will have to accept, and money moves only through
-  Economy after the Property transfer is confirmed.
+- **Fixed in H4:** a sale to another player used to take the buyer's money without
+  asking them. The buyer now gets an offer (60 seconds) and pays only by accepting.

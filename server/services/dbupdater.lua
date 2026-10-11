@@ -87,14 +87,22 @@ CreateThread(function()
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     ]])
 
-    -- Create the bcchousing_transactions table if it doesn't exist
+    -- Agent payouts: a retry queue for sales back to the agent (see sellHouse.lua).
+    -- Economy holds the money; a row here only records a payout until it is paid.
     DB.exec([[
         CREATE TABLE IF NOT EXISTS `bcchousing_transactions` (
             `id` int(11) NOT NULL AUTO_INCREMENT,
             `houseid` int(11) NOT NULL,
             `identifier` varchar(50) NOT NULL,
-            `amount` int(11) NOT NULL,
-            PRIMARY KEY (`id`)
+            `amount` DECIMAL(14,2) NOT NULL,
+            `currency` varchar(16) NOT NULL DEFAULT 'dollars',
+            `reason` varchar(64) NOT NULL DEFAULT 'housing.sold_to_agent',
+            `idempotency_key` varchar(128) NOT NULL,
+            `status` varchar(16) NOT NULL DEFAULT 'pending',
+            `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `uq_bcchousing_payout_key` (`idempotency_key`),
+            KEY `idx_bcchousing_payout_pending` (`status`, `identifier`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
     ]])
 
