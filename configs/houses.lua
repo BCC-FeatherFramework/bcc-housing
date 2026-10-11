@@ -32,7 +32,7 @@ Houses = {
         sellPrice = 1900,                                -- Amount received when selling the house
         rentalDeposit = 15,                              -- First Rental deposit in gold bars
         rentCharge = 7.5,                                -- Monthly rent in gold bars
-        currencyType = 0,                                -- 0 = cash, 1 = gold, 2 = Rol Tokens (character.rol)
+        currencyType = 0,                                -- 0 = dollars, 1 = gold (Feather Economy currencies)
         allowRental = true,                             -- Set to false to disable renting for this house
         name = "House",                                  -- Name of the house for display
         canSell = true,                                  -- Whether the player can sell the house later
