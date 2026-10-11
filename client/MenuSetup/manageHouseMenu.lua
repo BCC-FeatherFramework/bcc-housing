@@ -84,17 +84,10 @@ local function getHouseConfigForMenu(houseId)
     return nil
 end
 
+-- Title of the taxes menu (the house ledger was removed: taxes are paid from the
+-- wallet through feather-economy, see server/services/taxes.lua).
 local function getLedgerMenuLabels(houseId)
-    local houseConfig = getHouseConfigForMenu(houseId)
-    local currencyType = tonumber(houseConfig and houseConfig.currencyType) or 0
-
-    if currencyType == 1 then
-        return _U("ledgerGold"), _U("ledgerInsertGold")
-    elseif currencyType == 2 then
-        return _U("ledgerRol"), _U("ledgerInsertRol")
-    end
-
-    return _U("ledger"), _U("ledgerInsert")
+    return _U("taxesMenu")
 end
 
 local function getHousePreviewData(houseId)
@@ -136,52 +129,58 @@ local function getHousePreviewData(houseId)
     }
 end
 
-local function openLedgerMenu(houseId, isOwner, ownershipStatus, parentRoute, paymentOnly)
-    local ledgerTitle, ledgerInsertLabel = getLedgerMenuLabels(houseId)
-    local ledgerPage = BCCHousingMenu:RegisterPage('bcc-housing:ledger:page')
+local function refreshHouseAfterPayment(houseId, result)
+    if result and result.taxesPaid then
+        local ctx = GetHouseContext and GetHouseContext(houseId)
+        if ctx then
+            ctx.taxesOverdue = false
+            ctx.taxPaymentReleased = false
+            SetActiveHouseContext(ctx)
+        elseif HouseId and tonumber(houseId) == tonumber(HouseId) then
+            HouseTaxesOverdue = false
+            HouseTaxPaymentReleased = false
+        end
+    end
+    HousingRPC:CallAsync('bcc-housing:CheckIfHasHouse', {})
+end
 
-    ledgerPage:RegisterElement('header', {
-        value = ledgerTitle,
+-- paymentOnly: the house is overdue and released by staff; only the arrears can be paid.
+local function openLedgerMenu(houseId, isOwner, ownershipStatus, parentRoute, paymentOnly)
+    local taxesPage = BCCHousingMenu:RegisterPage('bcc-housing:ledger:page')
+
+    taxesPage:RegisterElement('header', {
+        value = _U("taxesMenu"),
         slot = "header",
         style = {}
     })
 
-    ledgerPage:RegisterElement('button', {
-        label = _U("checkledger"),
+    taxesPage:RegisterElement('button', {
+        label = _U("checkTaxes"),
         style = {}
     }, function()
-        local success, err = HousingRPC:CallAsync('bcc-housing:CheckLedger', { houseid = houseId })
-        if not success then
-            DBG:Info("CheckLedger RPC failed: " .. tostring(err and err.error))
-        end
+        HousingRPC:CallAsync('bcc-housing:CheckLedger', { houseid = houseId })
     end)
 
-    ledgerPage:RegisterElement('button', {
-        label = ledgerInsertLabel,
-        style = {}
-    }, function()
-        if houseId then
-            TriggerEvent('bcc-housing:addLedger', houseId, isOwner)
-        else
-            DBG:Error("Error: HouseId is undefined or invalid.")
-        end
-    end)
-
-    if ownershipStatus == "purchased" and not paymentOnly then
-        ledgerPage:RegisterElement('button', {
-            label = _U('removeFromLedger'),
+    if paymentOnly then
+        taxesPage:RegisterElement('button', {
+            label = _U("payTaxesArrears"),
             style = {}
         }, function()
-            if houseId then
-                TriggerEvent('bcc-housing:removeLedger', houseId, isOwner)
-            else
-                DBG:Error("Error: HouseId is undefined or invalid.")
-            end
+            local success, result = HousingRPC:CallAsync('bcc-housing:PayTaxes', { houseid = houseId, months = 0 })
+            if success then refreshHouseAfterPayment(houseId, result) end
+            BCCHousingMenu:Close()
+        end)
+    else
+        taxesPage:RegisterElement('button', {
+            label = _U("payTaxesAhead"),
+            style = {}
+        }, function()
+            TriggerEvent('bcc-housing:addLedger', houseId, isOwner, ownershipStatus)
         end)
     end
 
-    ledgerPage:RegisterElement('line', { slot = "footer", style = {} })
-    ledgerPage:RegisterElement('button', {
+    taxesPage:RegisterElement('line', { slot = "footer", style = {} })
+    taxesPage:RegisterElement('button', {
         label = _U("backButton"),
         slot = "footer",
         style = {}
@@ -192,9 +191,9 @@ local function openLedgerMenu(houseId, isOwner, ownershipStatus, parentRoute, pa
             OpenHousingMainMenu(houseId, isOwner, ownershipStatus)
         end
     end)
-    ledgerPage:RegisterElement('bottomline', { style = {}, slot = "footer" })
+    taxesPage:RegisterElement('bottomline', { style = {}, slot = "footer" })
 
-    BCCHousingMenu:Open({ startupPage = ledgerPage })
+    BCCHousingMenu:Open({ startupPage = taxesPage })
 end
 
 local function formatPurchasedAt(value)
@@ -1179,74 +1178,51 @@ function enterOrExitHouse(enter, tpHouseIndex)
     end
 end
 
--- Event to open the add ledger page
+-- Pay taxes (rent) ahead: the player chooses how many months.
 RegisterNetEvent('bcc-housing:addLedger')
-AddEventHandler('bcc-housing:addLedger', function(houseId, isOwner)
-    DBG:Info("Adding ledger for House ID: " .. tostring(houseId))
-    local AddLedgerPage = BCCHousingMenu:RegisterPage('add_ledger_page')
-    local amountToInsert = nil
+AddEventHandler('bcc-housing:addLedger', function(houseId, isOwner, ownershipStatus)
+    local _, info = HousingRPC:CallAsync('bcc-housing:CheckLedger', { houseid = houseId })
+    local maxMonths = type(info) == 'table' and tonumber(info.maxMonths) or 12
+    local PayAheadPage = BCCHousingMenu:RegisterPage('add_ledger_page')
+    local months = nil
 
-    AddLedgerPage:RegisterElement('header', {
-        value = _U('ledger'),
+    PayAheadPage:RegisterElement('header', {
+        value = _U('payTaxesAhead'),
         slot = 'header',
         style = {}
     })
 
-    AddLedgerPage:RegisterElement('input', {
-        label = _U('taxAmount'),
-        placeholder = _U("ledgerAmountToInsert"),
+    PayAheadPage:RegisterElement('input', {
+        label = _U('monthsToPay', maxMonths),
+        placeholder = '1',
         inputType = 'number',
         slot = 'content',
         style = {}
     }, function(data)
-        if data.value and tonumber(data.value) and tonumber(data.value) > 0 then
-            amountToInsert = tonumber(data.value)
-        else
-            amountToInsert = nil
-            DBG:Warning("Invalid input for amount.")
-        end
+        local value = tonumber(data.value)
+        months = (value and value >= 1 and value <= maxMonths and value % 1 == 0) and value or nil
     end)
 
-    AddLedgerPage:RegisterElement('line', {
+    PayAheadPage:RegisterElement('line', {
         slot = "footer",
         style = {}
     })
 
-    AddLedgerPage:RegisterElement('button', {
+    PayAheadPage:RegisterElement('button', {
         label = _U("Confirm"),
         slot = "footer",
         style = {}
     }, function()
-        if amountToInsert then
-            DBG:Info("Submitting ledger update for amount: " .. tostring(amountToInsert) .. " (Adding)")
-            local success, err = HousingRPC:CallAsync('bcc-housing:LedgerHandling', {
-                amount = amountToInsert,
-                houseid = houseId,
-                isAdding = true
-            }) -- true for adding
-            if not success then
-                DBG:Info("Ledger add RPC failed: " .. tostring(err and err.error))
-            else
-                if err and err.taxesPaid then
-                    local ctx = GetHouseContext and GetHouseContext(houseId)
-                    if ctx then
-                        ctx.taxesOverdue = false
-                        ctx.taxPaymentReleased = false
-                        SetActiveHouseContext(ctx)
-                    elseif HouseId and tonumber(houseId) == tonumber(HouseId) then
-                        HouseTaxesOverdue = false
-                        HouseTaxPaymentReleased = false
-                    end
-                end
-                HousingRPC:CallAsync('bcc-housing:CheckIfHasHouse', {})
-            end
-            BCCHousingMenu:Close()
-        else
-            DBG:Error("Error: Amount not set or invalid.")
+        if not months then
+            Notify(_U('taxesPrepayLimit', maxMonths), 'error', 4000)
+            return
         end
+        local success, result = HousingRPC:CallAsync('bcc-housing:PayTaxes', { houseid = houseId, months = months })
+        if success then refreshHouseAfterPayment(houseId, result) end
+        BCCHousingMenu:Close()
     end)
 
-    AddLedgerPage:RegisterElement('button', {
+    PayAheadPage:RegisterElement('button', {
         label = _U("backButton"),
         slot = "footer",
         style = {}
@@ -1254,82 +1230,12 @@ AddEventHandler('bcc-housing:addLedger', function(houseId, isOwner)
         OpenHousingMainMenu(houseId, isOwner, ownershipStatus)
     end)
 
-    AddLedgerPage:RegisterElement('bottomline', {
+    PayAheadPage:RegisterElement('bottomline', {
         slot = "footer",
         style = {}
     })
 
-    BCCHousingMenu:Open({ startupPage = AddLedgerPage })
-end)
-
--- Event to open the remove ledger page
-RegisterNetEvent('bcc-housing:removeLedger')
-AddEventHandler('bcc-housing:removeLedger', function(houseId, isOwner)
-    DBG:Info("Remove ledger for House ID: " .. tostring(houseId))
-    local RemoveLedgerPage = BCCHousingMenu:RegisterPage('remove_ledger_page')
-    local amountToInsert = nil
-
-    RemoveLedgerPage:RegisterElement('header', {
-        value = _U('ledger'),
-        slot = 'header',
-        style = {}
-    })
-
-    RemoveLedgerPage:RegisterElement('input', {
-        label = _U('taxAmount'),
-        placeholder = _U("ledgerAmountToInsert"),
-        inputType = 'number',
-        slot = 'content',
-        style = {}
-    }, function(data)
-        if data.value and tonumber(data.value) and tonumber(data.value) > 0 then
-            amountToInsert = tonumber(data.value)
-        else
-            amountToInsert = nil
-            DBG:Warning("Invalid input for amount.")
-        end
-    end)
-
-    RemoveLedgerPage:RegisterElement('line', {
-        slot = "footer",
-        style = {}
-    })
-
-    RemoveLedgerPage:RegisterElement('button', {
-        label = _U("Confirm"),
-        slot = "footer",
-        style = {}
-    }, function()
-        if amountToInsert then
-            DBG:Info("Submitting ledger update for amount: " .. tostring(amountToInsert) .. " (Removing)")
-            local success, err = HousingRPC:CallAsync('bcc-housing:LedgerHandling', {
-                amount = amountToInsert,
-                houseid = houseId,
-                isAdding = false
-            }) -- false for removing
-            if not success then
-                DBG:Info("Ledger remove RPC failed: " .. tostring(err and err.error))
-            end
-            BCCHousingMenu:Close()
-        else
-            DBG:Error("Error: Amount not set or invalid.")
-        end
-    end)
-
-    RemoveLedgerPage:RegisterElement('button', {
-        label = _U("backButton"),
-        slot = "footer",
-        style = {}
-    }, function()
-        OpenHousingMainMenu(houseId, isOwner, ownershipStatus)
-    end)
-
-    RemoveLedgerPage:RegisterElement('bottomline', {
-        slot = "footer",
-        style = {}
-    })
-
-    BCCHousingMenu:Open({ startupPage = RemoveLedgerPage })
+    BCCHousingMenu:Open({ startupPage = PayAheadPage })
 end)
 
 function enterTpHouse(houseTable)

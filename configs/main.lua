@@ -102,16 +102,20 @@ Config = {
     --Maximum allowed houses per character
     Setup = {
         MaxHousePerChar = 1,
-        DefaultRentalCurrency = 0, -- 0 cash, 1 gold, 2 Rol Tokens
+        DefaultRentalCurrency = 0, -- 0 dollars, 1 gold (Feather Economy currencies)
         RentedInventoryLimitMultiplier = 0.5, -- 50% of base limit
+        MaxTaxPrepayMonths = 12, -- players may pay taxes/rent up to this many months ahead
     },
     -----------------------------------------------------
 
+    -- Taxes (rent for rented houses) are taken from the holder's wallet through
+    -- feather-economy every month on the day the house was bought. Months paid
+    -- ahead are skipped. A wallet that cannot pay makes the house overdue (its
+    -- feather-property property is suspended) until staff release it and the
+    -- holder pays.
     collectTaxes = false,
-    -- New properties are billed monthly on their purchased_at anniversary day.
-    -- TaxDay is only used to assign a fallback purchased_at date to legacy database rows.
+    -- TaxDay is only used to assign a fallback purchased_at date to rows without one.
     TaxDay = 26,
-    TaxResetDay = 27, -- Deprecated compatibility setting; anniversary billing does not use this value.
     -----------------------------------------------------
 
     -- Discord Webhooks

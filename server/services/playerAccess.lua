@@ -17,22 +17,17 @@ HousingRPC:Register("bcc-housing:GetPlayersWithAccess", function(params, cb, rec
     if result and #result > 0 then
         local allowedIds = json.decode(result[1].allowed_ids)
         if allowedIds and #allowedIds > 0 then
-            -- Convert the allowed IDs list into placeholders
-            local placeholders = string.rep('?,', #allowedIds):sub(1, -2) -- e.g., "?,?"
-            local query = "SELECT * FROM characters WHERE charidentifier IN (" .. placeholders .. ")"
-
-            -- Fetch detailed character information
-            local characterDetails = DB.query(query, table.unpack(allowedIds))
-            if characterDetails and #characterDetails > 0 then
-                for _, character in ipairs(characterDetails) do
-                    DBG:Info("Character found: ID=" ..
-                        character.charidentifier .. ", Name=" .. character.firstname .. " " .. character.lastname)
-                end
-                cb(characterDetails) -- Pass the character details back to the client
-            else
-                DBG:Info("No character details found for the allowed IDs.")
-                cb({})
+            -- Names come from the Feather character profile (online or offline).
+            local characterDetails = {}
+            for _, characterId in ipairs(allowedIds) do
+                local firstname, lastname = HousingCharacters.GetName(tostring(characterId))
+                characterDetails[#characterDetails + 1] = {
+                    charidentifier = characterId,
+                    firstname = firstname,
+                    lastname = lastname
+                }
             end
+            cb(characterDetails)
         else
             DBG:Info("No allowed IDs found for House ID: " .. tostring(houseId))
             cb({})

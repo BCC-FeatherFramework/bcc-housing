@@ -43,7 +43,6 @@ CreateThread(function()
             `invlimit` varchar(50) NOT NULL DEFAULT 200,
             `player_source_spawnedfurn` varchar(50) NOT NULL DEFAULT 'none',
             `taxes_collected` varchar(50) NOT NULL DEFAULT 'false',
-            `ledger` float NOT NULL DEFAULT 0,
             `tax_amount` float NOT NULL DEFAULT 0,
             PRIMARY KEY `houseid` (`houseid`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -63,6 +62,8 @@ CreateThread(function()
     DB.exec("ALTER TABLE `bcchousing` ADD COLUMN IF NOT EXISTS `purchased_at` DATETIME NULL DEFAULT NULL")
     -- The house's feather-property property (see server/feather/property.lua).
     DB.exec("ALTER TABLE `bcchousing` ADD COLUMN IF NOT EXISTS `property_id` CHAR(36) NULL DEFAULT NULL")
+    -- Taxes paid ahead cover every due date up to this day (no money is kept here).
+    DB.exec("ALTER TABLE `bcchousing` ADD COLUMN IF NOT EXISTS `taxes_paid_until` DATE NULL DEFAULT NULL")
     local lastTaxProcessedColumnCount = tonumber(DB.value([[
         SELECT COUNT(*)
         FROM information_schema.COLUMNS

@@ -31,17 +31,8 @@ local function collectAdminHouseData()
         DBG:Info('Processing house with ID:', houseInfo.houseid, 'and character identifier:', houseCharIdentifier)
 
         if houseCharIdentifier then
-            local characterData = DB.query('SELECT firstname, lastname FROM characters WHERE charidentifier = ?', houseCharIdentifier)
-
-            if characterData and #characterData > 0 then
-                houseInfo.firstName = characterData[1].firstname
-                houseInfo.lastName = characterData[1].lastname
-                DBG:Info('Character found in database - First Name:', houseInfo.firstName, 'Last Name:', houseInfo.lastName)
-            else
-                houseInfo.firstName = 'Unknown'
-                houseInfo.lastName = 'Unknown'
-                DBG:Info('Warning: No character data found for character identifier:', houseCharIdentifier)
-            end
+            -- Names come from the Feather character profile (online or offline).
+            houseInfo.firstName, houseInfo.lastName = HousingCharacters.GetName(tostring(houseCharIdentifier))
         else
             houseInfo.firstName = 'Unknown'
             houseInfo.lastName = 'Unknown'

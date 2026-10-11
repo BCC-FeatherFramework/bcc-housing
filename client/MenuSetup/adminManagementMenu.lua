@@ -353,7 +353,7 @@ function AdminManagementMenuHouseChose(houseInfo)
         "\n" ..
         _U("houseDetailsInvLimit", houseInfo.invlimit and tostring(houseInfo.invlimit) or "N/A") .. "\n" ..
         _U("houseDetailsTaxes", houseInfo.tax_amount and tostring(houseInfo.tax_amount) or "N/A") .. "\n" ..
-        _U("houseDetailsLedger", houseInfo.ledger and tostring(houseInfo.ledger) or "0") .. "\n" ..
+        _U("houseDetailsLedger", houseInfo.taxes_paid_until and tostring(houseInfo.taxes_paid_until) or "-") .. "\n" ..
         _U("houseDetailsTaxStatus", _U(taxStatus))
     )
 
