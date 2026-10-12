@@ -434,19 +434,15 @@ CreateThread(function()
     if not Furniture.MenuItem or Furniture.MenuItem == '' then
         return
     end
-    exports.vorp_inventory:registerUsableItem(
-        Furniture.MenuItem,
-        function(data)
-            local src = data.source
-            local character = getCharacter(src)
-            if not character then return end
+    while GetResourceState('feather-inventory') ~= 'started' do Wait(1000) end
+    HousingInventory.RegisterUsable(Furniture.MenuItem, function(src)
+        local character = getCharacter(src)
+        if not character then return end
 
-            local ownedItems = loadOwnedFurniture(character.charIdentifier)
-            HousingRPC:Notify("bcc-housing:OpenFurnitureBook", { ownedFurniture = ownedItems }, src)
-            exports.vorp_inventory:closeInventory(src)
-        end,
-        GetCurrentResourceName()
-    )
+        local ownedItems = loadOwnedFurniture(character.charIdentifier)
+        HousingRPC:Notify("bcc-housing:OpenFurnitureBook", { ownedFurniture = ownedItems }, src)
+        HousingInventory.Close(src)
+    end)
 end)
 
 HousingRPC:Register("bcc-housing:GiveFurnitureBook", function(_, cb, src)
@@ -461,14 +457,13 @@ HousingRPC:Register("bcc-housing:GiveFurnitureBook", function(_, cb, src)
         return cb(false, _U("unknownError"))
     end
 
-    local hasItem = exports.vorp_inventory:getItem(src, Furniture.MenuItem)
-    if hasItem then
+    if HousingInventory.Count(src, Furniture.MenuItem) > 0 then
         return cb(false, _U("alreadyHasFurnitureBook"))
     end
 
-    local added = exports.vorp_inventory:addItem(src, Furniture.MenuItem, 1)
-    if not added then
-        DBG:Info("bcc-housing: vorp_inventory refused to add furniture book for src " .. tostring(src))
+    local added = HousingInventory.Add(src, Furniture.MenuItem, 1)
+    if not added.ok then
+        DBG:Info("bcc-housing: feather-inventory refused to add furniture book for src " .. tostring(src), added.code)
         return cb(false, _U("furnitureBookFailed"))
     end
 

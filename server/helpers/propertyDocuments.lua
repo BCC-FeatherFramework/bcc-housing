@@ -76,41 +76,35 @@ function GiveHousePropertyDocument(source, character, houseConfig, houseId, owne
         return
     end
 
-    local canCarry = exports.vorp_inventory:canCarryItem(source, cfg.item, 1)
-    if canCarry == false then
+    -- The deed is a feather-inventory item; its metadata is a display copy.
+    -- Ownership truth stays in feather-property (featherPropertyId).
+    local propertyRow = DB.one('SELECT property_id FROM bcchousing WHERE houseid = ?', houseId)
+    metadata.featherPropertyId = propertyRow and propertyRow.property_id or nil
+
+    if not HousingInventory.CanHold(source, cfg.item, 1) then
         NotifyClient(source, _U("propertyDeedInventoryFull"), 4000, "error")
         if cbFn then cbFn(false, "inventory_full") end
         return
     end
 
-    exports.vorp_inventory:addItem(source, cfg.item, 1, metadata, function(success)
-        if success == false then
-            NotifyClient(source, _U("propertyDeedIssueFailed"), 4000, "error")
-            if cbFn then cbFn(false, "add_item_failed") end
-            return
-        end
+    local added = HousingInventory.Add(source, cfg.item, 1, metadata)
+    if not added.ok then
+        NotifyClient(source, _U("propertyDeedIssueFailed"), 4000, "error")
+        if cbFn then cbFn(false, "add_item_failed") end
+        return
+    end
 
-        local encoded = json.encode(metadata)
-        CreateThread(function()
-            DB.exec('UPDATE bcchousing SET property_deed = ? WHERE houseid = ?', encoded, houseId)
-        end)
-        if cbFn then cbFn(true, metadata) end
-    end)
+    DB.exec('UPDATE bcchousing SET property_deed = ? WHERE houseid = ?', json.encode(metadata), houseId)
+    if cbFn then cbFn(true, metadata) end
 end
 
 function RemoveHousePropertyDocument(source, houseId)
     local cfg = getHouseDocumentConfig()
     if not cfg.enabled or not cfg.removePreviousDeedOnTransfer or not source or not houseId then return end
 
-    exports.vorp_inventory:getItemContainingMetadata(source, cfg.item, {
-        documentType = "property_deed",
-        propertyType = "house",
-        propertyId = tostring(houseId)
-    }, function(item)
-        if item and item.id then
-            exports.vorp_inventory:subItemById(source, item.id, nil, nil, 1)
-        end
-    end)
+    local character = GetHousingCharacter(source)
+    if not character then return end
+    HousingInventory.RemoveByMetadata(character.charIdentifier, cfg.item, 'propertyId', tostring(houseId))
 end
 
 HousingRPC:Register("bcc-housing:GetOwnedPropertyDocuments", function(_, cb, src)
@@ -156,15 +150,12 @@ HousingRPC:Register("bcc-housing:IssuePropertyDocument", function(params, cb, sr
         return
     end
 
-    local rows = DB.query([[
+    local house = DB.one([[
         SELECT houseid, charidentifier, uniqueName, ownershipStatus
         FROM bcchousing
-        WHERE houseid = ? AND charidentifier = ?
-        LIMIT 1
-    ]], houseId, character.charIdentifier) or {}
-
-    local house = rows[1]
-    if not house then
+        WHERE houseid = ?
+    ]], houseId)
+    if not house or not IsHouseOwner(src, houseId) then
         NotifyClient(src, _U("propertyNotOwned"), 4000, "error")
         cb(false)
         return

@@ -67,10 +67,6 @@ local function decodePolyPoints(payload)
     return normalized
 end
 
-local function getHouseInventoryId(houseId, ownershipStatus)
-    local suffix = ownershipStatus == 'rented' and '_bcc-houseinv_rent' or '_bcc-houseinv'
-    return 'Player_' .. tostring(houseId) .. suffix
-end
 
 local function getStageBonus(stage)
     local bonus = 0
@@ -133,6 +129,8 @@ local function formatPurchasedAt(value)
     return tostring(value):sub(1, 16)
 end
 
+-- Registers (or resizes) the house's feather-inventory container.
+-- Returns the container and its slot limit.
 local function ensureHouseInventoryRegistered(houseId, houseData, forcedLimit)
     if not houseData then return end
 
@@ -141,27 +139,8 @@ local function ensureHouseInventoryRegistered(houseId, houseData, forcedLimit)
         finalLimit = select(1, calculateFinalInventoryLimit(houseData.invlimit, houseData.ownershipStatus, houseData.inventory_current_stage))
     end
 
-    local inventoryId = getHouseInventoryId(houseId, houseData.ownershipStatus)
-    if not exports.vorp_inventory:isCustomInventoryRegistered(inventoryId) then
-        exports.vorp_inventory:registerInventory({
-            id = inventoryId,
-            name = _U("houseInv"),
-            limit = finalLimit,
-            acceptWeapons = true,
-            shared = true,
-            ignoreItemStackLimit = true,
-            whitelistItems = false,
-            UsePermissions = false,
-            UseBlackList = false,
-            whitelistWeapons = false
-        })
-    end
-
-    pcall(function()
-        exports.vorp_inventory:updateCustomInventorySlots(inventoryId, finalLimit)
-    end)
-
-    return inventoryId, finalLimit
+    local container = HousingInventory.EnsureHouseStorage(houseId, _U("houseInv") .. ' #' .. tostring(houseId), finalLimit)
+    return container, finalLimit
 end
 
 -- Event to insert a house into the database when it is created
@@ -518,14 +497,18 @@ HousingRPC:Register('bcc-house:OpenHouseInv', function(params, cb, src)
     end
 
     local finalLimit = select(1, calculateFinalInventoryLimit(houseData.invlimit, houseData.ownershipStatus, houseData.inventory_current_stage))
-    local inventoryId = ensureHouseInventoryRegistered(houseId, houseData, finalLimit)
-
-    local function openInventory()
-        exports.vorp_inventory:openInventory(src, inventoryId)
-        if cb then cb(true) end
+    local container = ensureHouseInventoryRegistered(houseId, houseData, finalLimit)
+    if not container then
+        NotifyClient(src, _U('noHouseFound'), 4000, 'error')
+        if cb then cb(false) end
+        return
     end
 
-    if tostring(houseData.charidentifier) == tostring(charIdentifier) then
+    local function openInventory()
+        if cb then cb(HousingInventory.Open(src, container)) end
+    end
+
+    if IsHouseOwner(src, houseId) then
         DBG:Info("Player is the owner of house ID: " .. tostring(houseId))
         openInventory()
         return
@@ -566,10 +549,8 @@ HousingRPC:Register('bcc-house:AdminOpenHouseInv', function(params, cb, src)
 
     local houseData = result[1]
     local finalLimit = select(1, calculateFinalInventoryLimit(houseData.invlimit, houseData.ownershipStatus, houseData.inventory_current_stage))
-    local inventoryId = ensureHouseInventoryRegistered(houseId, houseData, finalLimit)
-    exports.vorp_inventory:openInventory(src, inventoryId)
-
-    if cb then cb(true) end
+    local container = ensureHouseInventoryRegistered(houseId, houseData, finalLimit)
+    if cb then cb(container ~= nil and HousingInventory.Open(src, container)) end
 end)
 
 HousingRPC:Register('bcc-housing:GetInventoryStages', function(params, cb, src)

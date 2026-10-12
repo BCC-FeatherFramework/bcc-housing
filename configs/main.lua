@@ -105,6 +105,7 @@ Config = {
         DefaultRentalCurrency = 0, -- 0 dollars, 1 gold (Feather Economy currencies)
         RentedInventoryLimitMultiplier = 0.5, -- 50% of base limit
         MaxTaxPrepayMonths = 12, -- players may pay taxes/rent up to this many months ahead
+        MaxStorageSlots = 1000, -- largest house or hotel storage in slots (feather-inventory limit 65535)
     },
     -----------------------------------------------------
 

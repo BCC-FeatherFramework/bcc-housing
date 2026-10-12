@@ -142,23 +142,11 @@ HousingRPC:Register('bcc-housing:RegisterHotelInventory', function(params, cb, s
         return
     end
 
-    local invId = 'bcc-housinginv:' .. tostring(hotelCfg.hotelId) .. tostring(charId)
-    local isRegistered = exports.vorp_inventory:isCustomInventoryRegistered(invId)
-    if isRegistered then if cb then cb(true) end return end
-
-    local data = {
-        id = invId,
-        name = _U("hotelInvName"),
-        limit = tonumber(hotelCfg.invSpace),
-        acceptWeapons = true,
-        shared = false,
-        ignoreItemStackLimit = true,
-        whitelistItems = false,
-        UsePermissions = false,
-        UseBlackList = false,
-        whitelistWeapons = false
-    }
-    exports.vorp_inventory:registerInventory(data)
+    -- One feather-inventory container per character and hotel.
+    if not HousingInventory.EnsureHotelStorage(hotelCfg.hotelId, charId, _U("hotelInvName"), tonumber(hotelCfg.invSpace)) then
+        if cb then cb(false) end
+        return
+    end
     if cb then cb(true) end
 end)
 
@@ -181,23 +169,6 @@ HousingRPC:Register('bcc-housing:HotelInvOpen', function(params, cb, src)
         return
     end
 
-    local invId = 'bcc-housinginv:' .. tostring(hotelCfg.hotelId) .. tostring(charId)
-    if not exports.vorp_inventory:isCustomInventoryRegistered(invId) then
-        local data = {
-            id = invId,
-            name = _U("hotelInvName"),
-            limit = tonumber(hotelCfg.invSpace),
-            acceptWeapons = true,
-            shared = false,
-            ignoreItemStackLimit = true,
-            whitelistItems = false,
-            UsePermissions = false,
-            UseBlackList = false,
-            whitelistWeapons = false
-        }
-        exports.vorp_inventory:registerInventory(data)
-    end
-
-    exports.vorp_inventory:openInventory(src, invId)
-    if cb then cb(true) end
+    local container = HousingInventory.EnsureHotelStorage(hotelCfg.hotelId, charId, _U("hotelInvName"), tonumber(hotelCfg.invSpace))
+    if cb then cb(container ~= nil and HousingInventory.Open(src, container)) end
 end)

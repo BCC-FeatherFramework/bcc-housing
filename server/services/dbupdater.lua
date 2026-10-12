@@ -106,6 +106,17 @@ CreateThread(function()
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
     ]])
 
+    -- One row per character and hotel: the key of that room's feather-inventory container.
+    DB.exec([[
+        CREATE TABLE IF NOT EXISTS `bcchousing_hotel_rooms` (
+            `id` int(11) NOT NULL AUTO_INCREMENT,
+            `hotel_id` int(11) NOT NULL,
+            `charidentifier` varchar(50) NOT NULL,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `uq_bcchousing_hotel_room` (`hotel_id`, `charidentifier`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    ]])
+
     DB.exec([[
         CREATE TABLE IF NOT EXISTS `bcchousing_ownedfurniture` (
             `charidentifier` varchar(50) NOT NULL,

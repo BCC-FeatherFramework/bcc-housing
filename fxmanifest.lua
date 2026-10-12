@@ -42,6 +42,7 @@ server_scripts {
     'server/feather/jobs.lua',
     'server/feather/property.lua',
     'server/feather/economy.lua',
+    'server/feather/inventory.lua',
     'server/helpers/functions.lua',
     'server/helpers/propertyDocuments.lua',
     'server/services/*.lua',
