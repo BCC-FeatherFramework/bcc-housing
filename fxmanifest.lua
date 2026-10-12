@@ -71,6 +71,7 @@ dependencies {
     'feather-property',
     'feather-authority',
     'feather-jobs',
+    'feather-routing',
     'bcc-doorlocks'
 }
 

@@ -1,108 +1,138 @@
 # bcc-housing
 
-> This housing script offers an indepth and immersive home owning experience for players! With features like owning furniture, taxes, and more this script will give a quality experience to all home owners!
+> Houses, rentals, hotels, furniture and property taxes for RedM on the **Feather Framework**.
 
-# Requirements
-- oxmysql
-- vorp_core
-- vorp_inventory
-- vorp_character
-- bcc-utils
-- bcc-doorlocks
-- feather-menu
-- [PolyZone](https://github.com/mkafrin/PolyZone/)
+Version **3.0.0** is the Feather port of BryceCanyonCounty's bcc-housing 2.5.0. Houses, hotels, furniture, PolyZones, interiors, menus, NPC agents and translations are unchanged; ownership, money, storage, doors and interiors go through the Feather domains that own them. bcc-housing keeps no money and is not the source of truth for who owns a house. Port details and phases: [FEATHER_PORT.md](FEATHER_PORT.md).
 
-# Features
-- Admin locked command to create houses!
-- Each house can have a custom set inventory limit!
-- Each house can have a cusstom tax amount!
-- Houses have a ledger for players to store the money for thier tax in!
-- Taxes and rent are taken from the property ledger monthly. Properties with insufficient funds are marked overdue instead of being deleted.
-- Can add as many furniture items as you want in the config!
-- House owners can buy furniture and place it around thier house!
-- House owners can sell the furniture they bought!
-- House owners can give and/or remove access to players
-- When players approach a house, they will receive a notification indicating that they have entered private property.
-- Ability to purchase the house specified in the configuration.
-- Option to sell the house directly from the house menu.
-- Collect proceeds from house sales through the house dealer.
-- Players can now sell their house to another player at a price set in the config.
-- When selling a house to another player, the seller has the option to include or exclude the inventory.
-- No need for players to relog when buying or selling houses.
-- Easy to translate!
-- In depth webhooks!
-- Built in hotel system!
-- Version checking to help you keep up to date!
+## How it uses Feather
 
-# New Version Additions
-- Configured houses can use cash, gold, or Rol Tokens for purchases, rentals, and ledger payments.
-- Renting can be enabled or disabled for each configured house.
-- Tenants can end their current house rental from the house-management menu.
-- Property boundaries can use the existing radius system or PolyZone polygons.
-- Admins and configured realtor jobs can capture, export, preview, and update property PolyZones.
-- Property-area previews are available from the purchase and admin-management menus.
-- Property deed items with owner and house metadata are issued for purchased and rented properties.
-- Deeds are removed and reissued when a property is transferred to another player.
-- Taxes and rent are collected monthly on each property's purchase-date anniversary.
-- New properties skip tax or rent collection during their first calendar month.
-- Properties with insufficient ledger funds become overdue and have protected access restricted.
-- Admins and configured realtor jobs can list overdue houses and release them for payment.
-- Admins can view more property details, teleport to configured houses, preview boundaries, and open house inventories.
-- Added server-side permission and ownership checks to sensitive house, door, ledger, and admin operations.
-- Added protection against two players purchasing the same configured house simultaneously.
+| Concern | Owner |
+|---|---|
+| Who owns or rents a house; hotel rooms | **feather-property** (`bcc-housing:<uniqueName>`, `bcc-housing:custom:<id>`, `bcc-housing:hotel:<id>`) |
+| Prices, rent, taxes, furniture, sales | **feather-economy** (wallets; no ledger, no balances here) |
+| House and hotel storage, deeds, furniture book | **feather-inventory** |
+| Door locks | **bcc-doorlocks** server API |
+| Interiors (hotel rooms, teleport houses) | **feather-routing** |
+| Housing staff | **feather-authority** (`staff.housing.manage`) and Feather Admin staff |
+| Realtor and agent jobs | **feather-jobs** |
+| Characters, RPC, translations, notifications | feather-core, feather-character, feather-notify |
+| Menus, prompts, blips, NPCs | feather-menu-v2, feather-toolkit |
 
-# New Version Configuration
-- `configs/main.lua`: PolyZone controls, property deeds, rental defaults, allowed realtor jobs, and notification settings.
-- `configs/houses.lua`: per-house `currencyType`, `allowRental`, `rentalDeposit`, `rentCharge`, and optional PolyZone fields.
-- [PolyZone](https://github.com/mkafrin/PolyZone/) is now a required dependency.
+## Features
 
-# Rol Tokens
-- `Rol Tokens` is the user-facing name for the VORP character `rol` balance.
-- Set a configured house's `currencyType = 2` to use Rol Tokens for its purchase, rental, and ledger payments.
-- The script checks `character.rol` for available tokens and uses VORP currency type `2` when removing or returning them.
-- Houses purchased with Rol Tokens cannot be sold back or transferred through the normal house-sale workflow.
+- **Houses for sale or rent** from `configs/houses.lua`, priced in dollars or gold. Two buyers can never get the same house.
+- **Staff-created houses** for any character (`/HousingManager`), with radius or PolyZone areas and picked doors.
+- **Roommates** (up to `playerMax`) get door and house access; only the holder can sell or manage.
+- **Taxes and rent** are taken from the holder's wallet every month on the day the house was bought. Holders may pay up to `Config.Setup.MaxTaxPrepayMonths` months ahead (a paid-until date, not a balance). An empty wallet makes the house overdue: it is suspended until staff release it and the holder pays.
+- **Selling:** back to the housing agent (paid straight into the wallet) or to another player, who must accept the offer before paying.
+- **Storage** per house and per hotel room, with paid upgrade stages.
+- **Furniture:** buy from vendors, place, move and sell back; the furniture book lists what you own.
+- **Property deeds** as inventory items.
+- **Hotels:** buy a room once, enter a private instanced room with its own storage.
+- **Doors:** configured doors are locked for the holder on purchase; owners can lock more doors of their house.
+- Translations: English, Romanian, Polish, German, French and Ukrainian (per player, through feather-core).
 
-# Property Deeds
-- Enable or disable property deeds with `Config.PropertyDocuments.enabled`.
-- The configured deed item, `property_deed` by default, must exist in VORP inventory and support item metadata.
-- A deed containing the property name, house ID, owner, ownership type, and issue date is issued when a property is purchased or rented.
-- Property owners can request another deed from a configured real-estate agent.
-- When a property is transferred to another player, the previous deed is removed and a new deed is issued when `removePreviousDeedOnTransfer` is enabled.
-- The deed is only issued when the receiving player has enough inventory space.
+## Requirements
 
-# Taxes and Rent
-- New purchases, rentals, and admin-created houses save the current database time in the `purchased_at` column.
-- Monthly tax or rent collection is based on each property's `purchased_at` anniversary day instead of one global collection day.
-- New properties are not charged during the same calendar month in which they were purchased or rented.
-- Existing properties without a `purchased_at` value receive a legacy fallback date based on `Config.TaxDay` during the database migration.
-- `Config.TaxDay` is only used for that legacy migration fallback. `Config.TaxResetDay` is no longer used by the anniversary-based collection process.
-- The collection service checks once per hour and uses `last_tax_processed_at` to prevent duplicate monthly charges.
-- Properties with insufficient ledger funds are marked overdue and protected access is restricted until staff releases the property for payment.
+```cfg
+ensure feather-mysql
+ensure feather-core
+ensure feather-character
+ensure feather-notify
+ensure feather-toolkit
+ensure feather-menu-v2
+ensure feather-economy
+ensure feather-inventory
+ensure feather-organizations
+ensure feather-authority
+ensure feather-property
+ensure feather-jobs
+ensure feather-routing
+ensure feather-admin
+ensure bcc-doorlocks
+ensure bcc-housing
+```
 
-# Furniture Vendors
-- Furniture-vendor NPCs support both `npc.active` and the legacy `npc.show` setting.
-- `npc.active` takes priority when both settings are present. Vendors default to enabled when neither setting is configured.
-- Vendor interaction checks use an adaptive delay, reducing client usage while players are away from furniture vendors.
-- Vendor furniture can be previewed, rotated, and zoomed before purchase.
-- Furniture books can be obtained from configured furniture vendors.
-- Placed furniture can only be modified by players with property access, and overdue properties block furniture placement.
+PolyZone is optional: house areas use a built-in polygon check; with PolyZone running (add `'@PolyZone/client.lua'` as the first client script) outlines are drawn too.
 
-# How it works
-- Admins can create and manage houses with only command "/HousingManager"
-- You can easly change the command in config 
-- The owner will be able to walk upto where his ranch is press "G" to open a menu to manage the house!
+## Installation
 
-# How to install
-- Install and ensure all resources listed under Requirements before ensuring `bcc-housing`.
-- Add the configured property deed and furniture book items to VORP inventory when those features are enabled.
-- Database tables and required migration columns are created automatically.
+1. Put the folder in `resources/[bcc]/bcc-housing`.
+2. Import [sql/install_items.sql](sql/install_items.sql) once (`property_deed`, `furniture_book`), then restart feather-inventory.
+3. Add the trust entries below, restart the changed resources, then `ensure bcc-housing`. Tables are created on start; configured houses and hotels are registered in feather-property.
+4. Run `HousingReleaseSmokeTest` in the server console and expect every line to pass.
+5. Give staff the housing role: `HousingAdminGrant <server id>` (Feather Admin administrators and owners are staff already).
 
-# Custom Interiors Coords (Credits to punchedgang/siddwell740)
+### Trust entries
+
+Keep the entries already in each list and add `['bcc-housing'] = true`:
+
+| Resource | Lists |
+|---|---|
+| feather-property `config.lua` | `trustedReaders`, `trustedManagers`, `trustedAuditors` |
+| feather-economy `config.lua` | `trustedReaders`, `trustedProvisioners`, `trustedTransactors`, `trustedSuppliers` |
+| feather-authority `config.lua` | `trustedReaders`, `trustedCapabilityRegistrars`, `trustedRoleCreators`, `trustedGrantors`, `trustedAssigners` |
+| feather-jobs `config.lua` | `trustedReaders` |
+
+And the service policy in **feather-admin `configs/service_policy.lua`**:
+
+```lua
+Config.servicePolicy = {
+    -- existing domains unchanged
+    ['feather-property'] = {
+        ['bcc-housing'] = {
+            ['property.property.manage'] = true, -- register houses and hotels, suspend/retire
+            ['property.interest.manage'] = true  -- owners, tenants, transfers
+        }
+    },
+    ['feather-economy'] = {
+        -- existing entries unchanged
+        ['bcc-housing'] = {
+            ['economy.currency.issue'] = true    -- the agent buys houses and furniture back
+        }
+    }
+}
+```
+
+Without the `economy.currency.issue` grant, sales back to the agent stay queued (and furniture cannot be sold back); everything else works.
+
+## Commands
+
+| Command | Who | Purpose |
+|---|---|---|
+| `/HousingManager` | Staff | Create and manage houses |
+| `/HouseMenu` | Holder | Open the house menu |
+| `/editfurniture` | Holder | Edit nearby placed furniture |
+| `/housingpoly` | Staff | Capture a PolyZone for a new house |
+| `HousingReleaseSmokeTest` | Console | Read-only release check |
+| `HousingAdminGrant <id>` / `HousingAdminRevoke <id>` | Console | Give or remove the housing staff role |
+| `HousingPropertyStatus <houseid>` | Console | What feather-property records for a house |
+
+## Configuration
+
+See [configs/main.lua](configs/main.lua). Feather-specific settings:
+
+| Setting | Purpose |
+|---|---|
+| `Config.Admin` | Staff capability and role, Feather Admin staff capabilities, realtor jobs (`jobs`) |
+| `Config.Setup.MaxTaxPrepayMonths` | How many months of taxes/rent may be paid ahead |
+| `Config.Setup.MaxStorageSlots` | Largest house or hotel storage |
+| `Config.Setup.DefaultRentalCurrency` | `0` dollars, `1` gold |
+| `Config.collectTaxes` | Turn monthly taxes and rent on |
+| `Config.NotifyStyle` | feather-notify style |
+| `currencyType` (per house) | `0` dollars, `1` gold (Rol tokens are not supported) |
+| Agent `jobs` (configs/npcAgents.lua) | feather-jobs job keys and minimum grade ordinals |
+
+## Custom Interiors Coords (Credits to punchedgang/siddwell740)
+
 - Siddin3 = {x = -1103.15, y = -2252.92, z = 50.65}
 - Siddin4 = {x = -63.74, y = 14.05, z = 76.6}
 
-# Side Notes
-- This is a massive project there is most likely oversights if you have any suggestions or bugs report them asap!
-- To delete houses you will currently have to delete them manually from the database!
-- Do not place furniture directly ontop of one another they can be really close/sitting ontop of each other etc just make sure they are not in the exact same spot. If they are when you try to sell one of them it will sell every piece of furniture that is in the exact same spot as the one your trying to sell
-- Need more help join the bcc discord heres the invite link: https://discord.gg/VrZEEpBgZJ
+## Notes
+
+- Do not place two pieces of furniture in exactly the same spot; selling one sells every piece at that spot.
+- Deleting a house (staff menu) frees a configured house for sale again and retires a staff-created one.
+
+## Credits
+
+Original script by [BryceCanyonCounty](https://github.com/BryceCanyonCounty/bcc-housing). Feather port by [BCC-FeatherFramework](https://github.com/BCC-FeatherFramework/bcc-housing). Licensed GPL-3.0. Need help with the original gameplay? Join the BCC Discord: https://discord.gg/VrZEEpBgZJ
