@@ -704,13 +704,11 @@ function OpenHousingMainMenu(houseId, isOwner, ownershipStatus, taxPaymentReleas
                     style = {}
                 }, function()
                     BCCHousingMenu:Close()
-                    local playerId = GetPlayerServerId(PlayerId())
-                    local newDoorId = exports['bcc-doorlocks']:addPlayerToDoor(playerId)
-
-                    if newDoorId then
-                        DBG:Info("Door created and player added successfully: " .. tostring(newDoorId))
-                        HousingRPC:Call("bcc-housing:AddDoorToHouse",
-                            { houseId = houseId, newDoor = newDoorId },
+                    -- Aim at the door and confirm; the server creates the lock.
+                    local door = exports['bcc-doorlocks']:pickDoor()
+                    if door then
+                        HousingRPC:Call("bcc-housing:CreateHouseDoor",
+                            { houseId = houseId, door = door },
                             function(success)
                                 if success then
                                     Notify(_U("doorCreated"), "success", 4000)
@@ -1242,7 +1240,7 @@ function enterTpHouse(houseTable)
     DBG:Info("Entering TP house")
     InTpHouse = true
     local playerPed = PlayerPedId()
-    HousingInstance.Set(HousingInstance.Compute(TpHouseInstance))
+    HousingInstance.Enter('house', HouseId)
     SetEntityCoords(playerPed, houseTable.exitCoords.x, houseTable.exitCoords.y, houseTable.exitCoords.z, false, false, false, false)
     FreezeEntityPosition(playerPed, true)
     Wait(1000)

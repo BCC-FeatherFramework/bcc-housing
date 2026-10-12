@@ -296,10 +296,7 @@ function MainHotelHandler()
                                     if interiorHeading then
                                         SetEntityHeading(playerPed, interiorHeading)
                                     end
-                                    local serverId = GetPlayerServerId(player)
-                                    instanceNumber = math.random(1, 100000 + serverId)
-                                    local bucketId = serverId + instanceNumber
-                                    HousingInstance.Set(bucketId)
+                                    HousingInstance.Enter('hotel', hotel.hotelId)
                                     break
                                 end
                             end

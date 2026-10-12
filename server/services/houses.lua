@@ -187,7 +187,7 @@ local function handleCreationDBInsert(src, tpHouse, owner, radius, doors, houseC
         param = {
             ['charidentifier'] = owner,
             ['radius'] = numericRadius,
-            ['doors'] = json.encode(doors),
+            ['doors'] = '[]', -- locks are created below, after the house exists
             ['houseCoords'] = json.encode(houseCoords),
             ['invlimit'] = limitValue,
             ['taxes'] = taxes,
@@ -250,6 +250,10 @@ local function handleCreationDBInsert(src, tpHouse, owner, radius, doors, houseC
             return
         end
         DB.exec('UPDATE bcchousing SET property_id = ? WHERE houseid = ?', assigned.value.propertyId, houseId)
+        -- Doors picked by staff (bcc-doorlocks pickDoor) are locked for the owner.
+        if not tpHouse and type(doors) == 'table' and #doors > 0 then
+            CreateHouseDoorLocks(houseId, doors)
+        end
 
         Discord:sendMessage(_U('houseCreatedWebhook') ..
             tostring(character.charIdentifier) .. _U('houseCreatedWebhookGivenToo') .. tostring(owner))
@@ -758,43 +762,93 @@ HousingRPC:Register("bcc-housing:GetAllowedIdsForHouse", function(params, cb, re
 end)
 
 -- Register the RPC for adding a door to a house
-HousingRPC:Register("bcc-housing:AddDoorToHouse", function(params, cb, recSource)
-    local houseId = params and params.houseId
-    local newDoor = params and params.newDoor
+-- A door picked by the player (bcc-doorlocks pickDoor) becomes a lock of their
+-- house: the server checks the player holds the house (or is staff) and stands
+-- near the door, then creates the lock through the bcc-doorlocks API for the
+-- holder and roommates. The client never supplies a door ID.
+local MAX_DOOR_DISTANCE = 15.0
 
-    if not houseId or not newDoor then
-        cb(false) -- Invalid parameters
-        return
+local function doorPosition(door)
+    local entry = type(door) == 'table' and (type(door[1]) == 'table' and door[1] or door) or nil
+    if not entry then return nil end
+    local x, y, z = tonumber(entry[4]), tonumber(entry[5]), tonumber(entry[6])
+    return x and y and z and vector3(x, y, z) or nil
+end
+
+-- Character UUIDs that may open the doors of a house: its holder and roommates.
+function HouseDoorAccessIds(houseRow)
+    local ids = {}
+    if type(houseRow.charidentifier) == 'string' then ids[#ids + 1] = houseRow.charidentifier end
+    local ok, roommates = pcall(json.decode, houseRow.allowed_ids or '[]')
+    for _, id in ipairs(ok and type(roommates) == 'table' and roommates or {}) do
+        if tostring(id) ~= houseRow.charidentifier then ids[#ids + 1] = tostring(id) end
     end
+    return ids
+end
 
+-- Re-applies the holder and roommates to every lock of a house (after a sale
+-- or a roommate change).
+function SyncHouseDoors(houseId)
+    local row = DB.one('SELECT houseid, charidentifier, allowed_ids, doors FROM bcchousing WHERE houseid = ?', houseId)
+    if not row then return end
+    local ok, doorIds = pcall(json.decode, row.doors or '[]')
+    for _, doorId in ipairs(ok and type(doorIds) == 'table' and doorIds or {}) do
+        local door = DoorLocksAPI:GetDoorById(doorId)
+        if door then door:UpdateAllowedIds(HouseDoorAccessIds(row)) end
+    end
+end
+
+-- Deletes every lock of a house (the doors become free).
+function DeleteHouseDoors(houseId)
+    local row = DB.one('SELECT doors FROM bcchousing WHERE houseid = ?', houseId)
+    local ok, doorIds = pcall(json.decode, row and row.doors or '[]')
+    for _, doorId in ipairs(ok and type(doorIds) == 'table' and doorIds or {}) do
+        local door = DoorLocksAPI:GetDoorById(doorId)
+        if door then door:DeleteDoor() end
+    end
+end
+
+-- Creates locks for picked doors and appends their IDs to the house row.
+function CreateHouseDoorLocks(houseId, doorTables)
+    local row = DB.one('SELECT houseid, charidentifier, allowed_ids, doors FROM bcchousing WHERE houseid = ?', houseId)
+    if not row then return 0 end
+    local ok, current = pcall(json.decode, row.doors or '[]')
+    current = ok and type(current) == 'table' and current or {}
+    local created = 0
+    for _, door in ipairs(doorTables or {}) do
+        if doorPosition(door) and not DoorLocksAPI:GetDoorByInfo(door) then
+            local doorId = DoorLocksAPI:AddDoor(door, {}, 'none', HouseDoorAccessIds(row), true)
+            if doorId then
+                current[#current + 1] = doorId
+                created = created + 1
+            end
+        end
+    end
+    DB.exec('UPDATE bcchousing SET doors = ? WHERE houseid = ?', json.encode(current), houseId)
+    return created
+end
+
+HousingRPC:Register("bcc-housing:CreateHouseDoor", function(params, cb, recSource)
+    local houseId = tonumber(params and params.houseId)
+    local door = params and params.door
+    local position = doorPosition(door)
+    if not houseId or not position then
+        return cb(false)
+    end
     if not IsHouseOwner(recSource, houseId) and not IsHousingAdmin(recSource) then
         NotifyClient(recSource, _U('noAccessToHouse'), 4000, 'error')
-        cb(false)
-        return
+        return cb(false)
     end
-
-    -- Fetch the current doors for the specified house
-    local result = DB.query("SELECT doors FROM bcchousing WHERE houseid = ?", houseId)
-    if not result or #result == 0 then
-        cb(false) -- House not found
-        return
+    local ped = GetPlayerPed(recSource)
+    if ped and ped ~= 0 and #(GetEntityCoords(ped) - position) > MAX_DOOR_DISTANCE then
+        NotifyClient(recSource, _U('doorCreationFailed'), 4000, 'error')
+        return cb(false)
     end
-
-    -- Decode the current doors or initialize an empty table
-    local currentDoors = json.decode(result[1].doors or "[]")
-
-    -- Add the new door to the list
-    table.insert(currentDoors, newDoor)
-
-    -- Update the doors in the database
-    local updatedDoors = json.encode(currentDoors)
-    local success = DB.exec("UPDATE bcchousing SET doors = ? WHERE houseid = ?", updatedDoors, houseId)
-
-    if success then
-        cb(true) -- Door added successfully
-    else
-        cb(false) -- Failed to update the database
+    if DoorLocksAPI:GetDoorByInfo(door) then
+        NotifyClient(recSource, _U('doorSaveFailed'), 4000, 'error')
+        return cb(false)
     end
+    cb(CreateHouseDoorLocks(houseId, { door }) == 1)
 end)
 
 HousingRPC:Register("bcc-housing:GiveAccessToDoor", function(params, cb, src)

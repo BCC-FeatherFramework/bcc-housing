@@ -223,10 +223,10 @@ HousingRPC:Register('bcc-housing:buyHouse', function(params, cb, src)
 end)
 
 
+-- Locks the configured doors of a house for its new holder through the
+-- bcc-doorlocks server API (bcc-housing never writes the doorlocks table) and
+-- stores their door IDs on the house row.
 function insertHouseDoors(doors, charidentifier, houseId, uniqueName)
-    local doorIds = {} -- Store door ids to update the house later
-
-    -- Get the house configuration from the uniqueName to ensure correct doors are inserted
     local houseConfig = nil
     for _, house in pairs(Houses) do
         if house.uniqueName == uniqueName then
@@ -234,71 +234,35 @@ function insertHouseDoors(doors, charidentifier, houseId, uniqueName)
             break
         end
     end
-
-    if houseConfig and houseConfig.doors and #houseConfig.doors > 0 then
-        -- Insert each door specific to the house's unique configuration
-        for _, door in pairs(houseConfig.doors) do
-            local doorinfo = door.doorinfo
-            local locked = door.locked and 'true' or 'false'
-            local jobsAllowed = '[]' -- Default no jobs allowed
-            local keyItem = 'none'   -- Default key item
-            local idsAllowed = '[' .. charidentifier .. ']'
-
-            local doorData = DB.query('SELECT * FROM `doorlocks` WHERE `doorinfo` = ?', doorinfo)
-            if not doorData then
-                DBG:Info("Database query failed while checking if the door exists.")
-                return
-            end
-            if #doorData == 0 then
-                -- Insert the door if it doesn't exist
-                local doorId = DB.insert(
-                    "INSERT INTO doorlocks (doorinfo, jobsallowedtoopen, keyitem, locked, ids_allowed) VALUES (?, ?, ?, ?, ?)",
-                    doorinfo, jobsAllowed, keyItem, locked, idsAllowed
-                )
-                DBG:Info("Door inserted into DB with jobs: " .. jobsAllowed .. ", key: " .. keyItem .. ", ids: " .. idsAllowed)
-
-                TriggerClientEvent('bcc-doorlocks:ClientSetDoorStatus', -1, json.decode(doorinfo), locked, true, false, false)
-
-                -- Debug: print the values to be inserted
-                DBG:Info("Door inserted with ID: ", doorId)
-                table.insert(doorIds, doorId)
-
-            else
-                DBG:Info("Door already exists in DB")
-                local affectedRows = DB.exec(
-                    "UPDATE doorlocks SET jobsallowedtoopen = ?, keyitem = ?, locked = ?, ids_allowed = ? WHERE doorinfo = ?",
-                    jobsAllowed, keyItem, locked, idsAllowed, doorinfo
-                )
-                assert(affectedRows > 0, "Failed to update doorlocks table with new values.")
-                DBG:Info("Door updated in DB with jobs: " .. jobsAllowed .. ", key: " .. keyItem .. ", ids: " .. idsAllowed)
-
-                if #doorData > 1 then
-                    DBG:Warning("Multiple doors found with the same doorinfo:", doorData[0].doorinfo)
-                    DBG:Warning("Multiple doors found with the same doorinfo:", doorData[1].doorinfo)
-                end
-                -- TriggerClientEvent('bcc-doorlocks:ClientSetDoorStatus', -1, json.decode(doorinfo), locked, false, false, false)
-                for i = 1, #doorData do
-                    local doorId = doorData[i].doorid
-                    DBG:Info("Door inserted with ID: ", doorId)
-                    table.insert(doorIds, doorId)
-                end
-            end
-        end
-
-        -- Once all doors are inserted, update the house with the door IDs
-        if #doorIds ~= #houseConfig.doors then
-            DBG:Error("Failed to insert all doors for the house.", #doorIds .. " from " .. #houseConfig.doors)
-        end
-        local doorIdsJson = json.encode(doorIds)
-        local affectedDoorRows = DB.exec("UPDATE bcchousing SET doors = ? WHERE houseid = ?", doorIdsJson, houseId)
-        if affectedDoorRows > 0 then
-            DBG:Info("Updated house with door IDs:" .. doorIdsJson)
-        else
-            DBG:Error("Failed to update house with door IDs.")
-        end
-    else
+    if not houseConfig or not houseConfig.doors or #houseConfig.doors == 0 then
         DBG:Info("No doors found for the house.")
+        return
     end
+
+    local doorIds = {}
+    for _, door in pairs(houseConfig.doors) do
+        local locked = door.locked ~= false
+        local existing = DoorLocksAPI:GetDoorByInfo(door.doorinfo)
+        if existing then
+            existing:UpdateAllowedJobs({})
+            existing:UpdateKeyItem('none')
+            existing:UpdateAllowedIds({ charidentifier })
+            existing:UpdateLockStatus(locked)
+            doorIds[#doorIds + 1] = existing.id
+        else
+            local doorId = DoorLocksAPI:AddDoor(door.doorinfo, {}, 'none', { charidentifier }, locked)
+            if doorId then
+                doorIds[#doorIds + 1] = doorId
+            else
+                DBG:Error("Door could not be created for house", houseId, door.doorinfo)
+            end
+        end
+    end
+
+    if #doorIds ~= #houseConfig.doors then
+        DBG:Error("Failed to insert all doors for the house.", #doorIds .. " from " .. #houseConfig.doors)
+    end
+    DB.exec("UPDATE bcchousing SET doors = ? WHERE houseid = ?", json.encode(doorIds), houseId)
 end
 
 HousingRPC:Register('bcc-housing:getPurchasedHouses', function(_, cb, src)

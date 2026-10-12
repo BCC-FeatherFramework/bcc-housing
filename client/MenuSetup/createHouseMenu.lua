@@ -558,11 +558,15 @@ function doorCreationMenu()
         label = _U("createDoor")
     }, function()
         BCCHousingMenu:Close() -- Close the current menu before opening doorlocks
-        local door = exports['bcc-doorlocks']:createDoor()
+        -- Only pick the door here; the server locks it for the owner when the
+        -- house is created (bcc-housing:CreationDBInsert).
+        local door = exports['bcc-doorlocks']:pickDoor()
         if not globalHouseData.doors then
             globalHouseData.doors = {}
         end
-        table.insert(globalHouseData.doors, door)
+        if door then
+            table.insert(globalHouseData.doors, door)
+        end
         SetTimeout(500, function() -- Delay to prevent immediate reopening; adjust time as needed
             CreateHouseMenu(false) -- Open the house creation menu again
         end)
@@ -571,10 +575,10 @@ function doorCreationMenu()
     -- List existing doors
     for k, door in ipairs(globalHouseData.doors or {}) do
         doorCreationMenuPage:RegisterElement('button', {
-            label = _U("doorId") .. door.id, -- Assuming each door has a unique 'id'
+            label = _U("doorId") .. tostring(k) .. ' (' .. tostring(type(door[1]) == 'table' and door[1][3] or door[3]) .. ')',
             style = {}
         }, function()
-            DBG:Info("Selected door with ID:", door.id)
+            DBG:Info("Selected door:", k)
         end)
     end
 

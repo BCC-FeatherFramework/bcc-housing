@@ -205,6 +205,7 @@ HousingRPC:Register('bcc-housing:RemovePlayerAccess', function(params, cb, src)
 
     if affectedRows and affectedRows > 0 then
         DBG:Info("Removed player access successfully for Player ID: " .. tostring(playerId))
+        SyncHouseDoors(houseId) -- the removed roommate's door access ends too
         HousingRPC:Notify('bcc-housing:ClientRecHouseLoad', {}, src)
         NotifyClient(src, _U("removeAccessTo") .. tostring(playerId), 4000, "success")
         if cb then cb(true) end

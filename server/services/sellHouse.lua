@@ -139,7 +139,8 @@ local function handleSellHouse(src, houseIdParam, cb)
             local decodeOk, doorIdsJson = pcall(json.decode, houseData.doors)
             if decodeOk and type(doorIdsJson) == 'table' then
                 for _, doorId in ipairs(doorIdsJson) do
-                    DB.exec('DELETE FROM doorlocks WHERE doorid = ?', doorId)
+                    local door = DoorLocksAPI:GetDoorById(doorId)
+                    if door then door:DeleteDoor() end
                 end
             end
         end
@@ -218,7 +219,8 @@ local function handleUnrentHouse(src, houseIdParam, cb)
             local decodeOk, doorIdsJson = pcall(json.decode, houseData.doors)
             if decodeOk and type(doorIdsJson) == 'table' then
                 for _, doorId in ipairs(doorIdsJson) do
-                    DB.exec('DELETE FROM doorlocks WHERE doorid = ?', doorId)
+                    local door = DoorLocksAPI:GetDoorById(doorId)
+                    if door then door:DeleteDoor() end
                 end
             end
         end
@@ -345,7 +347,9 @@ local function completeSale(offer)
     if offer.withInventory then
         DB.exec('UPDATE bcchousing SET charidentifier = ?, purchaseCurrencyType = 0 WHERE houseid = ?',
             buyer.charIdentifier, offer.houseId)
+        SyncHouseDoors(offer.houseId) -- the locks now open for the buyer
     else
+        DeleteHouseDoors(offer.houseId)
         DB.exec('UPDATE bcchousing SET charidentifier = ?, furniture = "none", doors = "none", purchaseCurrencyType = 0 WHERE houseid = ?',
             buyer.charIdentifier, offer.houseId)
     end

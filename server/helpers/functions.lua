@@ -48,9 +48,9 @@ function IsDoorOwnedByCharacter(src, doorId)
     local numericDoorId = tonumber(doorId)
     if not character or not numericDoorId then return false end
 
-    local houses = DB.query('SELECT charidentifier, doors FROM bcchousing WHERE doors IS NOT NULL AND doors != ?', 'none') or {}
+    local houses = DB.query('SELECT houseid, uniqueName, charidentifier, doors FROM bcchousing WHERE doors IS NOT NULL AND doors != ?', 'none') or {}
     for _, house in ipairs(houses) do
-        if tostring(house.charidentifier) == tostring(character.charIdentifier) then
+        if HousingProperty.Holds(HousingProperty.KeyForRow(house), character.charIdentifier) then
             local ok, doors = pcall(json.decode, house.doors)
             if ok and type(doors) == 'table' then
                 for _, houseDoorId in ipairs(doors) do

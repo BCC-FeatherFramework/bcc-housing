@@ -166,11 +166,15 @@ function IsPointInsideHousingArea(areaContext, point)
     return GetDistanceBetweenCoords(point.x, point.y, point.z, coords.x, coords.y, coords.z, true) <= radius
 end
 
-function HousingInstance.Set(bucketId)
-    bucketId = tonumber(bucketId) or 0
-    local success, response = HousingRPC:CallAsync('bcc-housing:SetInstance', { bucketId = bucketId })
+-- Asks the server to move us into a hotel room ('hotel', hotelId) or a teleport
+-- house ('house', houseId). The server checks access and picks the routing
+-- bucket through feather-routing.
+function HousingInstance.Enter(kind, id)
+    local params = { kind = kind }
+    if kind == 'hotel' then params.hotelId = id else params.houseId = id end
+    local success, response = HousingRPC:CallAsync('bcc-housing:EnterInstance', params)
     if not success then
-        DBG:Error("Failed to set instance: " .. tostring(response and response.error))
+        DBG:Error("Failed to enter instance: " .. tostring(response and response.error))
     end
     return success, response
 end
@@ -184,16 +188,7 @@ function HousingInstance.Clear()
     return success, response
 end
 
-function HousingInstance.Compute(offset)
-    offset = tonumber(offset) or 0
-    return GetPlayerServerId(PlayerId()) + offset
-end
 
-function HousingInstance.Auto(offset)
-    local bucketId = HousingInstance.Compute(offset)
-    HousingInstance.Set(bucketId)
-    return bucketId
-end
 
 BCCHousingMenu = FeatherMenu:RegisterMenu("bcc:housing:mainmenu",
     {
