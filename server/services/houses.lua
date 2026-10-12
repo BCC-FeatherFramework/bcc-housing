@@ -423,7 +423,6 @@ local function refreshPlayerHouses(targetSource)
                 
                 -- ✅ Notify player they own this house and show the ID
                 HousingRPC:Notify('bcc-housing:OwnsHouseClientHandler', { house = v, isOwner = true }, targetSource)
-                HousingRPC:Notify('bcc-housing:ShowMessage', { message = "You own house ID: " .. tostring(v.houseid) }, targetSource)
                 DBG:Info("Player " .. charIdentifierString .. " owns house ID: " .. tostring(v.houseid))
             else
                 if hasAccessToProperty then
