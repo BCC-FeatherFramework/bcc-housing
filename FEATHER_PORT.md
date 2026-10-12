@@ -1,6 +1,6 @@
 # BCC Housing: Feather port
 
-**Status:** code complete (H1–H7, 2026-10-12); not yet started on the server. Next: first start, `HousingReleaseSmokeTest`, then live tests.
+**Status:** code complete (H1–H7, 2026-10-12). Started on the development server: `HousingReleaseSmokeTest` 13/13 (33 houses and 7 hotels registered in feather-property). Next: live acceptance below.
 **Version:** 3.0.0 (from upstream bcc-housing 2.5.0)
 **Plans:** phase B2 of the [BCC on Feather master plan](https://github.com/BCC-FeatherFramework/bcc-feather-masterplan);
 phase P3 (first consumer) of the [Feather Property master plan](https://github.com/FeatherFramework/feather-framework-docs/blob/main/feather-property/Feather_Property_Master_Plan.md).
