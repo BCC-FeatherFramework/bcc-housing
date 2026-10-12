@@ -16,10 +16,12 @@ end
 local Prompt = {}
 Prompt.__index = Prompt
 
+-- feather-toolkit answers { ok = true, value = { completed = boolean } }.
 function Prompt:HasCompleted()
-    local completed = Toolkit:IsPromptCompleted(self.id)
-    return type(completed) == 'table' and completed.ok and completed.value == true
-        or completed == true
+    if not self.id then return false end
+    local result = Toolkit:IsPromptCompleted(self.id)
+    return type(result) == 'table' and result.ok == true and type(result.value) == 'table'
+        and result.value.completed == true
 end
 
 function Prompt:EnabledPrompt(enabled)
