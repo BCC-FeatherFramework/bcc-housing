@@ -168,7 +168,8 @@ AddEventHandler('onResourceStop', function(resourceName)
         DelSpawnedFurn(tonumber(playerId))
     end
     TriggerClientEvent("bcc-housing:ClearFurnitureEvent", -1)
-    DB.exec("UPDATE bcchousing SET player_source_spawnedfurn='none'")
+    -- No database writes here: the stopped resource could not receive the reply.
+    -- The spawned-furniture column is reset when bcc-housing starts.
 end)
 
 AddEventHandler('playerDropped', function()

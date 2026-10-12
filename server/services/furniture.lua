@@ -53,7 +53,11 @@ local function markHouseSpawnState(source, houseid, state)
         if not next(spawnedFurnitureByPlayer[source]) then
             spawnedFurnitureByPlayer[source] = nil
         end
-        DB.exec("UPDATE bcchousing SET player_source_spawnedfurn='none' WHERE houseid=?", houseid)
+        -- While stopping, the start-up reset clears this column instead (a query
+        -- sent now would answer a stopped resource).
+        if not BCCHousingResourceStopping then
+            DB.exec("UPDATE bcchousing SET player_source_spawnedfurn='none' WHERE houseid=?", houseid)
+        end
     end
 end
 

@@ -125,6 +125,9 @@ CreateThread(function()
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     ]])
 
+    -- Furniture spawned before a restart belongs to nobody now.
+    DB.exec("UPDATE `bcchousing` SET `player_source_spawnedfurn` = 'none' WHERE `player_source_spawnedfurn` <> 'none'")
+
     DbUpdated = true
 
     print("Database tables for \x1b[35m\x1b[1m*bcc-housing*\x1b[0m created or updated \x1b[32msuccessfully\x1b[0m.")
