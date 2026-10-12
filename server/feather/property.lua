@@ -342,14 +342,21 @@ function HousingProperty.Reconcile()
 end
 
 local function start()
+    print('[bcc-housing] property: waiting for feather-property and the database')
     local ready = Housing.Call(RESOURCE, 'AwaitReady', 30000)
     if not ready.ok then
         return print('[bcc-housing] property: feather-property is not ready: ' .. describe(ready))
     end
     while not DbUpdated do Wait(500) end
-    HousingProperty.RegisterConfigured()
-    HousingProperty.Reconcile()
+    local called, problem = xpcall(function()
+        HousingProperty.RegisterConfigured()
+        HousingProperty.Reconcile()
+    end, debug.traceback)
+    if not called then
+        return print('[bcc-housing] property: start-up failed: ' .. tostring(problem))
+    end
     HousingProperty.ready = true
+    print('[bcc-housing] property: ready')
 end
 
 CreateThread(start)

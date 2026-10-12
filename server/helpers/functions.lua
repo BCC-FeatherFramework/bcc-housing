@@ -1,5 +1,13 @@
 ---- Pulling Essentials -----
-DoorLocksAPI = exports['bcc-doorlocks']:getDoorLocksAPI()
+-- The bcc-doorlocks server API, fetched on every use so a restart of
+-- bcc-doorlocks (or bcc-housing starting first) never leaves a stale copy.
+DoorLocksAPI = setmetatable({}, {
+    __index = function(_, key)
+        if GetResourceState('bcc-doorlocks') ~= 'started' then return nil end
+        local ok, api = pcall(function() return exports['bcc-doorlocks']:getDoorLocksAPI() end)
+        return ok and type(api) == 'table' and api[key] or nil
+    end
+})
 
 DbUpdated = false -- Use this to stop taxes from running till db has been made
 BCCHousingResourceStopping = false
