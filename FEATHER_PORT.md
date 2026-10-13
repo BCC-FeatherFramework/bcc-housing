@@ -59,6 +59,11 @@ domains that own them; bcc-housing keeps no money and no ownership truth.
   numeric character IDs could not be mapped to Feather characters anyway.
 - **Fixed in H4:** a sale to another player used to take the buyer's money without
   asking them. The buyer now gets an offer (60 seconds) and pays only by accepting.
+- **Fixed 2026-10-13:** a house suspended for overdue taxes could still be sold to the
+  agent (Property allows `EndInterest` while suspended), and two sale requests close
+  together could both be paid. Sale to the agent and unrent now release only an active
+  property held by the caller (checked on the same snapshot as the release), and the
+  payout goes only to the request that deletes the house row.
 
 ## Live acceptance (to run)
 

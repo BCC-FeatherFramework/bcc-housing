@@ -232,9 +232,22 @@ end
 
 -- Ends every owner and tenant interest (sold back, rent ended, house deleted).
 -- The house stays registered and becomes available.
-function HousingProperty.Release(propertyKey, requestId, actorSource, reasonCode)
+-- opts.holderId: the release is refused unless this character is the holder and
+-- the property is active (a suspended house cannot be sold or given up). The
+-- check uses the same snapshot whose revision every EndInterest expects, so a
+-- suspension or a second release in between fails instead of slipping through.
+function HousingProperty.Release(propertyKey, requestId, actorSource, reasonCode, opts)
     local snapshot = HousingProperty.Get(propertyKey)
     if not snapshot.ok then return snapshot end
+    if opts and opts.holderId then
+        if snapshot.value.status ~= 'active' then
+            return Housing.Err('property_unavailable', 'The property is not active.', { status = snapshot.value.status })
+        end
+        local holder = HousingProperty.Holder(snapshot.value)
+        if not holder or holder.characterId ~= opts.holderId then
+            return Housing.Err('holder_mismatch', 'The character does not hold this property.')
+        end
+    end
     local interests = {}
     for _, list in ipairs({ snapshot.value.owners, snapshot.value.tenants }) do
         for _, interest in ipairs(list) do interests[#interests + 1] = interest end

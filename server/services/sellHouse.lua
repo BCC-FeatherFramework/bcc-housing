@@ -125,15 +125,23 @@ local function handleSellHouse(src, houseIdParam, cb)
 
         local sellPrice = tonumber(houseConfig.sellPrice) or 0
         -- Ownership ends in feather-property first; the house is for sale again.
+        -- Refused while suspended (overdue taxes) or when the seller no longer holds it.
         local released = HousingProperty.Release(propertyKey,
-            HousingProperty.RequestId('sell-npc', houseData.houseid, Housing.NewId()), src, 'housing.sold_to_agent')
+            HousingProperty.RequestId('sell-npc', houseData.houseid, Housing.NewId()), src, 'housing.sold_to_agent',
+            { holderId = charIdentifier })
         if not released.ok then
             DBG:Error('handleSellHouse: property release failed', released.code, released.message)
-            NotifyClient(src, _U('houseCannotBeSold'), 4000, 'error')
+            NotifyClient(src, _U(released.code == 'property_unavailable' and 'taxesOverdue' or 'houseCannotBeSold'), 4000, 'error')
             if cbFn then cbFn(false, { error = released.code }) end
             return
         end
-        DB.exec('DELETE FROM bcchousing WHERE houseid = ?', houseData.houseid)
+        -- Only the request that removes the row is paid, so a repeated sale pays once.
+        local deleted = DB.exec('DELETE FROM bcchousing WHERE houseid = ?', houseData.houseid)
+        if not deleted or deleted <= 0 then
+            DBG:Error('handleSellHouse: house row already gone, no payout', houseData.houseid)
+            if cbFn then cbFn(false, { error = 'house_not_found' }) end
+            return
+        end
 
         if houseData.doors and houseData.doors ~= 'none' then
             local decodeOk, doorIdsJson = pcall(json.decode, houseData.doors)
@@ -206,14 +214,21 @@ local function handleUnrentHouse(src, houseIdParam, cb)
         end
 
         -- The tenancy ends in feather-property first; the house is for rent again.
+        -- Refused while suspended: overdue rent is paid before the tenancy can end.
         local released = HousingProperty.Release(propertyKey,
-            HousingProperty.RequestId('unrent', houseData.houseid, Housing.NewId()), src, 'housing.rent_ended')
+            HousingProperty.RequestId('unrent', houseData.houseid, Housing.NewId()), src, 'housing.rent_ended',
+            { holderId = charIdentifier })
         if not released.ok then
             DBG:Error('handleUnrentHouse: property release failed', released.code, released.message)
+            if released.code == 'property_unavailable' then NotifyClient(src, _U('taxesOverdue'), 4000, 'error') end
             if cbFn then cbFn(false, { error = released.code }) end
             return
         end
-        DB.exec('DELETE FROM bcchousing WHERE houseid = ?', houseData.houseid)
+        local deleted = DB.exec('DELETE FROM bcchousing WHERE houseid = ?', houseData.houseid)
+        if not deleted or deleted <= 0 then
+            if cbFn then cbFn(false, { error = 'house_not_found' }) end
+            return
+        end
 
         if houseData.doors and houseData.doors ~= 'none' then
             local decodeOk, doorIdsJson = pcall(json.decode, houseData.doors)
