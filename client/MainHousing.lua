@@ -130,6 +130,7 @@ function ManageHotelBlips()
 end
 
 local function StartForCharacter()
+    CreateThread(RefreshPurchasedHouses) -- houses for sale: prompt, marker and blip
     HousingRPC:Notify('bcc-housing:getPlayersInfo', {})
     checkIfAdmin()
     local success, hotels = HousingRPC:CallAsync('bcc-housing:HotelDbRegistry', {})

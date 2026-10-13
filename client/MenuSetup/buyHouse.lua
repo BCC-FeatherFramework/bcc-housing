@@ -251,21 +251,40 @@ CreateThread(function()
     end
 end)
 
-CreateThread(function()
-    -- Request the purchased houses list from the server when the resource starts
-    local success, houses = HousingRPC:CallAsync('bcc-housing:getPurchasedHouses', {})
-    if success and type(houses) == 'table' then
-        PurchasedHouses = {}
-        for _, coords in ipairs(houses) do
-            if type(coords) == "table" and coords.x and coords.y and coords.z then
-                PurchasedHouses[#PurchasedHouses + 1] = vector3(coords.x, coords.y, coords.z)
-            else
-                PurchasedHouses[#PurchasedHouses + 1] = coords
+-- Loads which configured houses are taken (bought or rented). The server only
+-- answers once the player has a character, and not before bcc-housing's server
+-- side is up, so this retries and runs again whenever a character spawns
+-- (StartForCharacter). Until it succeeds every house shows as for sale.
+local purchasedHousesRefresh = 0
+
+function RefreshPurchasedHouses()
+    purchasedHousesRefresh = purchasedHousesRefresh + 1
+    local attempt = purchasedHousesRefresh
+    for try = 1, 10 do
+        local success, houses = HousingRPC:CallAsync('bcc-housing:getPurchasedHouses', {})
+        if attempt ~= purchasedHousesRefresh then return false end -- a newer refresh took over
+        if success and type(houses) == 'table' then
+            PurchasedHouses = {}
+            for _, coords in ipairs(houses) do
+                if type(coords) == "table" and coords.x and coords.y and coords.z then
+                    PurchasedHouses[#PurchasedHouses + 1] = vector3(coords.x, coords.y, coords.z)
+                else
+                    PurchasedHouses[#PurchasedHouses + 1] = coords
+                end
             end
+            rebuildPurchasedHouseLookup()
+            DBG:Info("Purchased houses loaded: " .. tostring(#PurchasedHouses))
+            return true
         end
-    else
-        DBG:Error("Failed to fetch purchased houses via RPC")
+        DBG:Warning("Purchased houses not loaded yet (try " .. try .. "), retrying")
+        Wait(math.min(try, 5) * 1000)
     end
+    DBG:Error("Failed to fetch purchased houses via RPC")
+    return false
+end
+
+CreateThread(function()
+    CreateThread(RefreshPurchasedHouses)
     rebuildPurchasedHouseLookup()
 
     local PromptGroup = HousingPrompts:SetupPromptGroup()
@@ -335,18 +354,7 @@ HousingRPC:Register('bcc-housing:housePurchased', function(params)
 end)
 
 HousingRPC:Register('bcc-housing:ReinitializeChecksAfterSale', function()
-    local success, houses = HousingRPC:CallAsync('bcc-housing:getPurchasedHouses', {})
-    if success and type(houses) == "table" then
-        PurchasedHouses = {}
-        for _, coords in ipairs(houses) do
-            if type(coords) == "table" and coords.x and coords.y and coords.z then
-                PurchasedHouses[#PurchasedHouses + 1] = vector3(coords.x, coords.y, coords.z)
-            else
-                PurchasedHouses[#PurchasedHouses + 1] = coords
-            end
-        end
-        rebuildPurchasedHouseLookup()
-    end
+    RefreshPurchasedHouses()
 end)
 
 function OpenBuyHouseMenu(house)
