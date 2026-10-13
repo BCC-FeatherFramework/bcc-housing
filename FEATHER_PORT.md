@@ -82,6 +82,8 @@ domains that own them; bcc-housing keeps no money and no ownership truth.
    paid, same obligation settled, house active). `HousingTaxRelease <houseid>` and
    `HousingTaxPayAs <characterUuid> <houseid> <months>` run single steps. Offline, the
    arrears are collected by bcc-housing; paying them in game runs with the player as debtor.
+   `HousingArrearsFlowTest 1 2026-12-12 <emma>` passed 10/10 on 2026-10-13; `ContractsReconcile`
+   stayed HEALTHY.
    Each charge must show in Contracts as a settled `housing_property_tax` (or `housing_rent`)
    obligation; an overdue house keeps one open obligation, which the arrears payment settles.
    `ContractsReconcile` stays HEALTHY with the settlements verified against Economy.
