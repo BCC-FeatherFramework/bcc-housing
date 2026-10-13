@@ -78,7 +78,7 @@ runs steps 2, 6 and 7 on feather-property through the same flows as the menus
 end the rental, unrent, buy (deed stored), sale with inventory to the second character, the
 former owner cannot sell, sale to the agent (payout paid), hotel room (not twice; ended again
 as cleanup). Both characters must hold no house. In game, the offer on the buyer's screen,
-menus, blips and door prompts still need a player.
+menus, blips and door prompts still need a player. Passed 15/15 on 2026-10-13 (house16).
 
 1. `HousingReleaseSmokeTest`: every line PASS.
 2. Buy a configured house; a second player cannot buy it. Rent another; unrent it.
