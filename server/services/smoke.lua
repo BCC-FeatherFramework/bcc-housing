@@ -39,6 +39,7 @@ RegisterCommand('HousingReleaseSmokeTest', function(source)
             { 'hotels registered', missingHotels == 0 },
             { 'house rows linked to Property', unlinked == 0 },
             { 'Economy trusts bcc-housing', economy.ok == true },
+            { 'Contracts tax types registered', HousingContracts.ready == true },
             { 'Jobs trusts bcc-housing', jobs.ok == true },
             { 'Authority staff role exists', authorityRole.ok == true },
             { 'Routing started', started('feather-routing') },

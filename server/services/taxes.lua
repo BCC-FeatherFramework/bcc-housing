@@ -182,9 +182,13 @@ local function processHouse(row, currentDate)
         DBG:Warning('[Taxes] house', row.houseid, 'has no payable currency or holder')
         return
     end
-    -- One key per house and due date: a restart on the due day never charges twice.
-    local paid = HousingEconomy.Pay({ characterId = row.character_id }, currency, taxAmount, reasonFor(row),
-        { type = 'housing_house', id = row.houseid }, ('housing:tax:%s:%s'):format(row.houseid, dueKey))
+    -- The charge is a feather-contracts obligation. Its request IDs are fixed per
+    -- house, due date and holder: a restart on the due day never charges twice.
+    local wallet = HousingEconomy.Wallet(row.character_id, currency)
+    if not wallet.ok then
+        return DBG:Error('[Taxes] house', row.houseid, 'has no wallet:', wallet.code, wallet.message)
+    end
+    local paid = HousingContracts.Charge(row, dueKey, HousingEconomy.ToMinor(taxAmount), currency)
     if paid.ok then
         DB.exec("UPDATE bcchousing SET taxes_collected = 'true', last_tax_processed_at = ? WHERE houseid = ?", dueKey, row.houseid)
         sendTaxWebhook(row, "paid", currency)
@@ -193,8 +197,11 @@ local function processHouse(row, currentDate)
         markOverdue(row, dueKey)
         sendTaxWebhook(row, "overdue", currency)
         DBG:Warning('[Taxes] house', row.houseid, 'overdue for', dueKey)
+    elseif paid.code == 'settlement_pending' then
+        -- Economy's answer is unknown; Contracts replays the same transfer and the next check sees the result.
+        DBG:Warning('[Taxes] house', row.houseid, 'payment pending for', dueKey)
     else
-        -- Economy unavailable: try again at the next check.
+        -- Contracts or Economy unavailable: try again at the next check.
         DBG:Error('[Taxes] house', row.houseid, 'charge failed:', paid.code, paid.message)
     end
 end
@@ -251,18 +258,15 @@ HousingRPC:Register('bcc-housing:PayTaxes', function(params, cb, src)
         return cb(false, { error = 'invalid_months' })
     end
 
-    local periods = months + (status == 'released' and 1 or 0)
-    local amount = taxAmount * periods
     local paymentId = Housing.NewId()
-    local paid = HousingEconomy.Pay(character, currency, amount, reasonFor(row),
-        { type = 'housing_house', id = houseId }, 'housing:tax-pay:' .. paymentId)
-    if not paid.ok then
-        NotifyClient(src, _U(HousingEconomy.MessageKey(paid, currency)), 4000, 'error')
-        return cb(false, { error = paid.code })
-    end
-
     local result = { taxesPaid = status == 'released' }
     if status == 'released' then
+        -- The arrears settle the house's open feather-contracts obligation.
+        local arrears = HousingContracts.PayArrears(src, row, HousingEconomy.ToMinor(taxAmount), currency, paymentId)
+        if not arrears.ok then
+            NotifyClient(src, _U(HousingEconomy.MessageKey(arrears, currency)), 4000, 'error')
+            return cb(false, { error = arrears.code })
+        end
         DB.exec("UPDATE bcchousing SET taxes_collected = 'true' WHERE houseid = ? AND taxes_collected = 'released'", houseId)
         local reactivated = HousingProperty.SetStatus(propertyKey(row), 'active',
             HousingProperty.RequestId('tax-reactivate', houseId, paymentId), 'housing.tax_paid')
@@ -270,6 +274,14 @@ HousingRPC:Register('bcc-housing:PayTaxes', function(params, cb, src)
         NotifyClient(src, _U('taxesArrearsPaid'), 5000, 'success')
     end
     if months > 0 then
+        -- Paying ahead is not a debt: it moves money directly and only advances taxes_paid_until.
+        local paid = HousingEconomy.Pay(character, currency, taxAmount * months, reasonFor(row),
+            { type = 'housing_house', id = houseId }, 'housing:tax-pay:' .. paymentId)
+        if not paid.ok then
+            NotifyClient(src, _U(HousingEconomy.MessageKey(paid, currency)), 4000, 'error')
+            result.error = paid.code
+            return cb(result.taxesPaid, result)
+        end
         local base = parseMysqlDate(row.taxes_paid_until)
         local now = today()
         if not base or compareDateParts(base, now) < 0 then base = now end

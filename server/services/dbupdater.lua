@@ -79,6 +79,8 @@ CreateThread(function()
     DB.exec("ALTER TABLE `bcchousing` ADD COLUMN IF NOT EXISTS `property_id` CHAR(36) NULL DEFAULT NULL")
     -- Taxes paid ahead cover every due date up to this day (no money is kept here).
     DB.exec("ALTER TABLE `bcchousing` ADD COLUMN IF NOT EXISTS `taxes_paid_until` DATE NULL DEFAULT NULL")
+    -- The latest tax or rent obligation in feather-contracts (see server/feather/contracts.lua).
+    DB.exec("ALTER TABLE `bcchousing` ADD COLUMN IF NOT EXISTS `tax_obligation_id` CHAR(36) NULL DEFAULT NULL")
     local lastTaxProcessedColumnCount = tonumber(DB.value([[
         SELECT COUNT(*)
         FROM information_schema.COLUMNS

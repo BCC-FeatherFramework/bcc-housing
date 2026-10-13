@@ -20,7 +20,8 @@ domains that own them; bcc-housing keeps no money and no ownership truth.
 | H4 Money | All money through feather-economy, none kept here: purchase/rent deposit (paid after the house is reserved; undone on failure), hotel rooms, furniture buy and agent buy-back, storage upgrades (stage claimed first), taxes and rent from the wallet on each due date with a `taxes_paid_until` date for months paid ahead (ledger removed; empty wallet = overdue + Property suspended), sale to the agent paid at once through Issue (`bcchousing_transactions` is only a retry queue with idempotency keys), sale between players only after the buyer accepts an offer (Property transfer, then buyer-to-seller payment, transfer undone if payment fails); Rol tokens refused | code complete |
 | H5 Storage and deeds | House storage: one feather-inventory container per house row (foreign key `bcchousing.houseid`, deleted with the row); hotel storage: one container per character and hotel (`bcchousing_hotel_rooms`); opened through a temporary access grant after the owner/roommate check; slots capped by `Config.Setup.MaxStorageSlots`. Deeds and the furniture book are feather-inventory items (`sql/install_items.sql`); a deed's metadata carries the house and feather-property IDs | code complete |
 | H6 Doors, access, instances | Doors only through the bcc-doorlocks server API (`AddDoor` returns IDs, `GetDoorByInfo`, client sync): configured doors locked for the holder on purchase, deleted on sale to the agent/unrent/sale without inventory, re-keyed to the buyer on sale with inventory; owners and staff add a door by picking it (`pickDoor`) and the server checks holder/staff and distance (the old route accepted any door ID from the client); roommate add/remove updates the locks. Interiors (hotel rooms, teleport houses) enter through `bcc-housing:EnterInstance`: the server checks access and joins a feather-routing route (private per character and hotel, shared per house); the client never picks a bucket | code complete |
-| H7 Tests and docs | `HousingReleaseSmokeTest` (13 read-only checks), README rewritten for Feather (requirements, trust entries, service policy, commands, configuration), `sql/install_items.sql` | code complete; live acceptance to run |
+| H8 Contracts | Monthly tax and rent are feather-contracts obligations (Contracts phase C4, first real issuer): types `housing_property_tax` and `housing_rent` (system issuer and creditor, no acceptance, issuer may collect, debtor may pay, no disputes) registered on start; on a due date bcc-housing drafts, issues and collects the obligation with request IDs fixed per house, due date and holder; insufficient funds = overdue (obligation stays open); arrears settle that obligation with the holder as actor; an unknown Economy outcome stays pending in Contracts and the next hourly run picks up the result; `bcchousing.tax_obligation_id`; staff delete cancels the open obligation. Paying ahead stays a direct Economy payment | code complete; live acceptance to run |
+| H7 Tests and docs | `HousingReleaseSmokeTest` (13 read-only checks; 14 with the H8 Contracts check), README rewritten for Feather (requirements, trust entries, service policy, commands, configuration), `sql/install_items.sql` | code complete; live acceptance to run |
 
 ## Rules (from the master plan)
 
@@ -51,6 +52,7 @@ domains that own them; bcc-housing keeps no money and no ownership truth.
 | feather-jobs `config.lua` | `trustedReaders` | H2 (added on the dev server) |
 | feather-property `config.lua`; feather-admin `configs/service_policy.lua` | `trustedReaders`, `trustedManagers`, `trustedAuditors`; `['feather-property']['bcc-housing']` `property.property.manage`, `property.interest.manage` | H3 (added on the dev server) |
 | feather-economy `config.lua`; feather-admin `configs/service_policy.lua` | `trustedReaders`, `trustedProvisioners`, `trustedTransactors`, `trustedSuppliers`; `['feather-economy']['bcc-housing']['economy.currency.issue']` (agent buy-back, furniture sell-back) | H4 (added on the dev server) |
+| feather-contracts `config.lua`; feather-admin `configs/service_policy.lua` | `trustedIssuers`; `['feather-contracts']['bcc-housing']` `contracts.obligation.issue`, `.cancel`, `.default` | H8 (added on the dev server) |
 - **Holder cache:** `bcchousing.character_id` and `bcchousinghotels` only cache the
   holder; feather-property is the truth. On start every configured house and hotel is
   registered and each house row is reconciled (a different holder fixes the cache; a row
@@ -74,6 +76,9 @@ domains that own them; bcc-housing keeps no money and no ownership truth.
 2. Buy a configured house; a second player cannot buy it. Rent another; unrent it.
 3. Pay taxes ahead; `SocietyDev`-style date tests are not built in: set `collectTaxes = true`
    and check the monthly charge, the overdue path (empty wallet), staff release and arrears.
+   Each charge must show in Contracts as a settled `housing_property_tax` (or `housing_rent`)
+   obligation; an overdue house keeps one open obligation, which the arrears payment settles.
+   `ContractsReconcile` stays HEALTHY with the settlements verified against Economy.
 4. Storage: put items in, restart, items still there; buy an upgrade stage.
 5. Doors: purchase locks the configured doors for you; add a door with "Create new door";
    add and remove a roommate (door access follows).

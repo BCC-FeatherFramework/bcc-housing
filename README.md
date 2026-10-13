@@ -10,6 +10,7 @@ Version **3.0.0** is the Feather port of BryceCanyonCounty's bcc-housing 2.5.0. 
 |---|---|
 | Who owns or rents a house; hotel rooms | **feather-property** (`bcc-housing:<uniqueName>`, `bcc-housing:custom:<id>`, `bcc-housing:hotel:<id>`) |
 | Prices, rent, taxes, furniture, sales | **feather-economy** (wallets; no ledger, no balances here) |
+| Monthly tax and rent debts | **feather-contracts** (obligation types `housing_property_tax`, `housing_rent`) |
 | House and hotel storage, deeds, furniture book | **feather-inventory** |
 | Door locks | **bcc-doorlocks** server API |
 | Interiors (hotel rooms, teleport houses) | **feather-routing** |
@@ -23,7 +24,7 @@ Version **3.0.0** is the Feather port of BryceCanyonCounty's bcc-housing 2.5.0. 
 - **Houses for sale or rent** from `configs/houses.lua`, priced in dollars or gold. Two buyers can never get the same house.
 - **Staff-created houses** for any character (`/HousingManager`), with radius or PolyZone areas and picked doors.
 - **Roommates** (up to `playerMax`) get door and house access; only the holder can sell or manage.
-- **Taxes and rent** are taken from the holder's wallet every month on the day the house was bought. Holders may pay up to `Config.Setup.MaxTaxPrepayMonths` months ahead (a paid-until date, not a balance). An empty wallet makes the house overdue: it is suspended until staff release it and the holder pays.
+- **Taxes and rent** are charged every month on the day the house was bought. Each charge is a feather-contracts obligation (holder owes the system) that bcc-housing collects from the holder's wallet at once. Holders may pay up to `Config.Setup.MaxTaxPrepayMonths` months ahead (a paid-until date, not a balance; paying ahead is a direct wallet payment, not an obligation). An empty wallet makes the house overdue: the obligation stays open and the house is suspended until staff release it and the holder pays, which settles that obligation. Deleting a house cancels its open obligation.
 - **Selling:** back to the housing agent (paid straight into the wallet) or to another player, who must accept the offer before paying.
 - **Storage** per house and per hotel room, with paid upgrade stages.
 - **Furniture:** buy from vendors, place, move and sell back; the furniture book lists what you own.
@@ -42,6 +43,7 @@ ensure feather-notify
 ensure feather-toolkit
 ensure feather-menu-v2
 ensure feather-economy
+ensure feather-contracts
 ensure feather-inventory
 ensure feather-organizations
 ensure feather-authority
@@ -71,6 +73,7 @@ Keep the entries already in each list and add `['bcc-housing'] = true`:
 |---|---|
 | feather-property `config.lua` | `trustedReaders`, `trustedManagers`, `trustedAuditors` |
 | feather-economy `config.lua` | `trustedReaders`, `trustedProvisioners`, `trustedTransactors`, `trustedSuppliers` |
+| feather-contracts `config.lua` | `Config.Access.trustedIssuers` |
 | feather-authority `config.lua` | `trustedReaders`, `trustedCapabilityRegistrars`, `trustedRoleCreators`, `trustedGrantors`, `trustedAssigners` |
 | feather-jobs `config.lua` | `trustedReaders` |
 
@@ -90,9 +93,18 @@ Config.servicePolicy = {
         ['bcc-housing'] = {
             ['economy.currency.issue'] = true    -- the agent buys houses and furniture back
         }
+    },
+    ['feather-contracts'] = {
+        ['bcc-housing'] = {
+            ['contracts.obligation.issue'] = true,   -- monthly tax and rent obligations
+            ['contracts.obligation.cancel'] = true,  -- a deleted house cancels its open obligation
+            ['contracts.obligation.default'] = true
+        }
     }
 }
 ```
+
+feather-contracts must itself be trusted by feather-economy (`trustedReaders` and `trustedTransactors`, see the feather-contracts README). Without the Contracts entries, taxes and rent are not collected (each due date is retried every hour).
 
 Without the `economy.currency.issue` grant, sales back to the agent stay queued (and furniture cannot be sold back); everything else works.
 

@@ -78,7 +78,7 @@ HousingRPC:Register('bcc-house:AdminManagementDelHouse', function(params, cb, sr
 
     -- Property first: a configured house is released (for sale again), a
     -- staff-created house is retired. The row is deleted only when that succeeded.
-    local row = DB.one('SELECT houseid, uniqueName FROM bcchousing WHERE houseid = ?', tonumber(houseId))
+    local row = DB.one('SELECT houseid, uniqueName, tax_obligation_id FROM bcchousing WHERE houseid = ?', tonumber(houseId))
     if not row then
         NotifyClient(src, _U('failedDeleteHouse'), 5000, "error")
         if cb then cb(false) end
@@ -96,6 +96,8 @@ HousingRPC:Register('bcc-house:AdminManagementDelHouse', function(params, cb, sr
         return
     end
 
+    -- An unpaid tax or rent obligation goes with the house.
+    HousingContracts.CancelOpen(row, 'housing.deleted')
     local affected = DB.exec("DELETE FROM bcchousing WHERE houseid=?", row.houseid)
     if affected and affected > 0 then
         NotifyClient(src, _U('housesDeleted'), 5000, "success")
