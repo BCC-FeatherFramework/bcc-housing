@@ -206,9 +206,11 @@ local function processHouse(row, currentDate)
     end
 end
 
-function HousingTaxes.Collect(currentDate)
+function HousingTaxes.Collect(currentDate, houseId)
     currentDate = currentDate or today()
-    for _, row in ipairs(DB.query("SELECT * FROM bcchousing") or {}) do
+    local rows = houseId and DB.query("SELECT * FROM bcchousing WHERE houseid = ?", houseId)
+        or DB.query("SELECT * FROM bcchousing")
+    for _, row in ipairs(rows or {}) do
         local called, problem = pcall(processHouse, row, currentDate)
         if not called then print('[bcc-housing] taxes: house ' .. tostring(row.houseid) .. ' failed: ' .. tostring(problem)) end
     end
@@ -222,6 +224,26 @@ CreateThread(function()
         Wait(60 * 60 * 1000) -- hourly; each house is charged at most once per due date
     end
 end)
+
+-- Console, DevMode only: HousingTaxCollectAt <YYYY-MM-DD> <houseid>
+-- Runs the tax/rent collection for one house as if today were that date (real
+-- money moves; nobody needs to be online). Use a date after the house's next due
+-- date; an empty holder wallet takes the overdue path.
+if Config.DevMode then
+    RegisterCommand('HousingTaxCollectAt', function(source, args)
+        if source ~= 0 then return end
+        local date, houseId = parseMysqlDate(args[1]), tonumber(args[2])
+        if not date or not houseId then
+            return print('[bcc-housing] Usage: HousingTaxCollectAt <YYYY-MM-DD> <houseid>')
+        end
+        HousingTaxes.Collect(date, houseId)
+        local row = DB.one([[SELECT taxes_collected, last_tax_processed_at, tax_obligation_id
+            FROM bcchousing WHERE houseid = ?]], houseId)
+        print(('[bcc-housing] house %s: taxes_collected=%s last_processed=%s obligation=%s'):format(houseId,
+            tostring(row and row.taxes_collected), tostring(row and row.last_tax_processed_at),
+            tostring(row and row.tax_obligation_id)))
+    end, true)
+end
 
 -- Pay ahead / pay arrears --------------------------------------------------------
 

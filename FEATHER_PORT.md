@@ -74,8 +74,10 @@ domains that own them; bcc-housing keeps no money and no ownership truth.
 
 1. `HousingReleaseSmokeTest`: every line PASS.
 2. Buy a configured house; a second player cannot buy it. Rent another; unrent it.
-3. Pay taxes ahead; `SocietyDev`-style date tests are not built in: set `collectTaxes = true`
-   and check the monthly charge, the overdue path (empty wallet), staff release and arrears.
+3. Pay taxes ahead. With `Config.DevMode = true`, `HousingTaxCollectAt <YYYY-MM-DD> <houseid>`
+   runs the monthly charge for one house as of that date with nobody online (it works even
+   with `collectTaxes = false`); check the charge, the overdue path (empty wallet), staff
+   release and arrears.
    Each charge must show in Contracts as a settled `housing_property_tax` (or `housing_rent`)
    obligation; an overdue house keeps one open obligation, which the arrears payment settles.
    `ContractsReconcile` stays HEALTHY with the settlements verified against Economy.
