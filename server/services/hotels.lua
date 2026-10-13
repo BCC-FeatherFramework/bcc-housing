@@ -12,7 +12,7 @@ local function findHotelConfig(hotelId)
 end
 
 local function loadOwnedHotels(charId)
-    local result = DB.query('SELECT `hotels` FROM `bcchousinghotels` WHERE `charidentifier` = ?', charId)
+    local result = DB.query('SELECT `hotels` FROM `bcchousinghotels` WHERE `character_id` = ?', charId)
     local payload = result and result[1] and result[1].hotels
     if not payload or payload == '' or payload == 'none' then
         return {}
@@ -28,15 +28,12 @@ local function ownsHotel(charId, hotelId)
 end
 
 HousingRPC:Register('bcc-housing:HotelDbRegistry', function(params, cb, src)
-    local user = HousingUser(src)
-    if not user then if cb then cb(false) end return end
-
-    local character = user.getUsedCharacter
-    if not character or not character.charIdentifier then
+    local character = GetHousingCharacter(src)
+    if not character or not character.characterId then
         if cb then cb(false) end
         return
     end
-    local charId = character.charIdentifier
+    local charId = character.characterId
 
     -- The character's hotel rooms are their tenant interests on hotel properties.
     local listed = Housing.Call('feather-property', 'ListPropertiesByHolder', {
@@ -55,7 +52,7 @@ HousingRPC:Register('bcc-housing:HotelDbRegistry', function(params, cb, src)
     end
 
     -- Keep the local cache in step (it is only a cache).
-    DB.exec('INSERT INTO `bcchousinghotels` (`charidentifier`, `hotels`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `hotels` = VALUES(`hotels`)',
+    DB.exec('INSERT INTO `bcchousinghotels` (`character_id`, `hotels`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `hotels` = VALUES(`hotels`)',
         charId, #ownedHotelsTable > 0 and json.encode(ownedHotelsTable) or 'none')
 
     if cb then cb(true, ownedHotelsTable) end
@@ -64,15 +61,12 @@ end)
 HousingRPC:Register('bcc-housing:HotelBought', function(params, cb, src)
     local requestedHotel = params and params.hotel
     local hotelTable = findHotelConfig(requestedHotel and requestedHotel.hotelId)
-    local user = HousingUser(src)
-    if not user then if cb then cb(false) end return end
-
-    local character = user.getUsedCharacter
-    if not character or not character.charIdentifier then
+    local character = GetHousingCharacter(src)
+    if not character or not character.characterId then
         if cb then cb(false) end
         return
     end
-    local charId = character.charIdentifier
+    local charId = character.characterId
 
     local hotelCost = hotelTable and tonumber(hotelTable.cost)
     if not hotelTable or not hotelCost or hotelCost <= 0 then
@@ -117,7 +111,7 @@ HousingRPC:Register('bcc-housing:HotelBought', function(params, cb, src)
 
     local ownedHotelsTable = loadOwnedHotels(charId)
     table.insert(ownedHotelsTable, hotelTable.hotelId)
-    DB.exec('INSERT INTO `bcchousinghotels` (`charidentifier`, `hotels`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `hotels` = VALUES(`hotels`)',
+    DB.exec('INSERT INTO `bcchousinghotels` (`character_id`, `hotels`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `hotels` = VALUES(`hotels`)',
         charId, json.encode(ownedHotelsTable))
 
     if cb then cb(true, ownedHotelsTable) end
@@ -125,15 +119,12 @@ end)
 
 HousingRPC:Register('bcc-housing:RegisterHotelInventory', function(params, cb, src)
     local hotelId = params and params.hotelId
-    local user = HousingUser(src)
-    if not user then if cb then cb(false) end return end
-
-    local character = user.getUsedCharacter
-    if not character or not character.charIdentifier then
+    local character = GetHousingCharacter(src)
+    if not character or not character.characterId then
         if cb then cb(false) end
         return
     end
-    local charId = character.charIdentifier
+    local charId = character.characterId
 
     local hotelCfg = findHotelConfig(hotelId)
     if not hotelCfg or not ownsHotel(charId, hotelCfg.hotelId) then
@@ -152,15 +143,12 @@ end)
 
 HousingRPC:Register('bcc-housing:HotelInvOpen', function(params, cb, src)
     local hotelId = params and params.hotelId
-    local user = HousingUser(src)
-    if not user then if cb then cb(false) end return end
-
-    local character = user.getUsedCharacter
-    if not character or not character.charIdentifier then
+    local character = GetHousingCharacter(src)
+    if not character or not character.characterId then
         if cb then cb(false) end
         return
     end
-    local charId = character.charIdentifier
+    local charId = character.characterId
 
     local hotelCfg = findHotelConfig(hotelId)
     if not hotelCfg or not ownsHotel(charId, hotelCfg.hotelId) then

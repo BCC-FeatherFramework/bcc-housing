@@ -32,7 +32,7 @@ local function buildHouseDeedMetadata(character, houseConfig, houseId, ownership
             _U("propertyDeedType") .. statusText,
             _U("propertyDeedProperty") .. houseName,
             _U("propertyDeedOwner") .. ownerName,
-            _U("propertyDeedCid") .. tostring(character and character.charIdentifier or unknownText),
+            _U("propertyDeedCid") .. tostring(character and character.characterId or unknownText),
             _U("propertyDeedHouseId") .. tostring(houseId or unknownText),
             _U("propertyDeedIssuedAt") .. os.date("%Y-%m-%d %H:%M:%S")
         }, "<br>"),
@@ -42,7 +42,7 @@ local function buildHouseDeedMetadata(character, houseConfig, houseId, ownership
         propertyId = tostring(houseId or ""),
         uniqueName = tostring(houseConfig and houseConfig.uniqueName or ""),
         ownerName = ownerName,
-        ownerCharIdentifier = tostring(character and character.charIdentifier or ""),
+        ownerCharacterId = tostring(character and character.characterId or ""),
         ownershipStatus = tostring(ownershipStatus or "purchased"),
         issuedAt = os.date("%Y-%m-%d %H:%M:%S")
     }
@@ -104,12 +104,11 @@ function RemoveHousePropertyDocument(source, houseId)
 
     local character = GetHousingCharacter(source)
     if not character then return end
-    HousingInventory.RemoveByMetadata(character.charIdentifier, cfg.item, 'propertyId', tostring(houseId))
+    HousingInventory.RemoveByMetadata(character.characterId, cfg.item, 'propertyId', tostring(houseId))
 end
 
 HousingRPC:Register("bcc-housing:GetOwnedPropertyDocuments", function(_, cb, src)
-    local user = HousingUser(src)
-    local character = user and user.getUsedCharacter
+    local character = GetHousingCharacter(src)
     if not character then
         cb(false, { error = "no_character" })
         return
@@ -118,9 +117,9 @@ HousingRPC:Register("bcc-housing:GetOwnedPropertyDocuments", function(_, cb, src
     local rows = DB.query([[
         SELECT houseid, uniqueName, ownershipStatus, property_deed
         FROM bcchousing
-        WHERE charidentifier = ?
+        WHERE character_id = ?
         ORDER BY houseid DESC
-    ]], character.charIdentifier) or {}
+    ]], character.characterId) or {}
 
     local items = {}
     for _, row in ipairs(rows) do
@@ -143,15 +142,14 @@ HousingRPC:Register("bcc-housing:IssuePropertyDocument", function(params, cb, sr
         return
     end
 
-    local user = HousingUser(src)
-    local character = user and user.getUsedCharacter
+    local character = GetHousingCharacter(src)
     if not character then
         cb(false, { error = "no_character" })
         return
     end
 
     local house = DB.one([[
-        SELECT houseid, charidentifier, uniqueName, ownershipStatus
+        SELECT houseid, character_id, uniqueName, ownershipStatus
         FROM bcchousing
         WHERE houseid = ?
     ]], houseId)

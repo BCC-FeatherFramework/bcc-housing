@@ -6,7 +6,7 @@
 HousingPayouts = {}
 
 function HousingPayouts.Attempt(row)
-    local paid = HousingEconomy.Issue(row.identifier, row.currency or 'dollars', tonumber(row.amount) or 0,
+    local paid = HousingEconomy.Issue(row.character_id, row.currency or 'dollars', tonumber(row.amount) or 0,
         row.reason or 'housing.sold_to_agent', { type = 'housing_house', id = row.houseid }, row.idempotency_key)
     if paid.ok then
         DB.exec("UPDATE bcchousing_transactions SET status = 'paid' WHERE id = ?", row.id)
@@ -15,16 +15,16 @@ function HousingPayouts.Attempt(row)
 end
 
 function HousingPayouts.Queue(characterId, houseId, amount, currency, reason, idempotencyKey)
-    local id = DB.insert([[INSERT INTO bcchousing_transactions (houseid, identifier, amount, currency, reason, idempotency_key, status)
+    local id = DB.insert([[INSERT INTO bcchousing_transactions (houseid, character_id, amount, currency, reason, idempotency_key, status)
         VALUES (?, ?, ?, ?, ?, ?, 'pending')]], houseId, characterId, amount, currency, reason, idempotencyKey)
-    return HousingPayouts.Attempt({ id = id, houseid = houseId, identifier = characterId, amount = amount,
+    return HousingPayouts.Attempt({ id = id, houseid = houseId, character_id = characterId, amount = amount,
         currency = currency, reason = reason, idempotency_key = idempotencyKey })
 end
 
 -- Retries every pending payout (or one character's).
 function HousingPayouts.RetryPending(characterId)
     local rows = characterId
-        and DB.query("SELECT * FROM bcchousing_transactions WHERE status = 'pending' AND identifier = ?", characterId)
+        and DB.query("SELECT * FROM bcchousing_transactions WHERE status = 'pending' AND character_id = ?", characterId)
         or DB.query("SELECT * FROM bcchousing_transactions WHERE status = 'pending' LIMIT 50")
     local paid = 0
     for _, row in ipairs(rows or {}) do
@@ -61,22 +61,15 @@ local function handleSellHouse(src, houseIdParam, cb)
         return
     end
 
-    local user = HousingUser(src)
-    if not user then
-        DBG:Info('handleSellHouse: no active character for source ' .. tostring(src))
-        if cbFn then cbFn(false, { error = 'no_user' }) end
-        return
-    end
-
-    local character = user.getUsedCharacter
+    local character = GetHousingCharacter(src)
     if not character then
         DBG:Info('handleSellHouse: no character for source ' .. tostring(src))
         if cbFn then cbFn(false, { error = 'no_character' }) end
         return
     end
 
-    local charIdentifier = character.charIdentifier
-    DBG:Info(('Sell house request for houseId %s by charIdentifier %s'):format(tostring(houseId), tostring(charIdentifier)))
+    local characterId = character.characterId
+    DBG:Info(('Sell house request for houseId %s by characterId %s'):format(tostring(houseId), tostring(characterId)))
 
     local result = DB.query('SELECT * FROM bcchousing WHERE houseid = ?', houseId)
         if not result or #result == 0 then
@@ -94,7 +87,7 @@ local function handleSellHouse(src, houseIdParam, cb)
         end
 
         local propertyKey = HousingProperty.KeyForRow(houseData)
-        if not HousingProperty.Holds(propertyKey, charIdentifier, 'owner') then
+        if not HousingProperty.Holds(propertyKey, characterId, 'owner') then
             DBG:Info('handleSellHouse: player does not own house ' .. tostring(houseId))
             NotifyClient(src, _U('noHouseOrNotOwner'), 4000, 'error')
             if cbFn then cbFn(false) end
@@ -128,7 +121,7 @@ local function handleSellHouse(src, houseIdParam, cb)
         -- Refused while suspended (overdue taxes) or when the seller no longer holds it.
         local released = HousingProperty.Release(propertyKey,
             HousingProperty.RequestId('sell-npc', houseData.houseid, Housing.NewId()), src, 'housing.sold_to_agent',
-            { holderId = charIdentifier })
+            { holderId = characterId })
         if not released.ok then
             DBG:Error('handleSellHouse: property release failed', released.code, released.message)
             NotifyClient(src, _U(released.code == 'property_unavailable' and 'taxesOverdue' or 'houseCannotBeSold'), 4000, 'error')
@@ -155,7 +148,7 @@ local function handleSellHouse(src, houseIdParam, cb)
 
         -- The agent pays straight into the wallet; a failure stays queued and is retried.
         if sellPrice > 0 then
-            local payout = HousingPayouts.Queue(charIdentifier, houseData.houseid, sellPrice, 'dollars',
+            local payout = HousingPayouts.Queue(characterId, houseData.houseid, sellPrice, 'dollars',
                 'housing.sold_to_agent', 'housing:sell-npc:' .. tostring(houseData.houseid) .. ':' .. Housing.NewId())
             if not payout.ok then
                 DBG:Error('handleSellHouse: payout queued for retry', payout.code)
@@ -163,7 +156,7 @@ local function handleSellHouse(src, houseIdParam, cb)
         end
 
         NotifyClient(src, _U('houseSoldSuccess', sellPrice), 4000, 'success')
-        Discord:sendMessage('House sold by charIdentifier: ' .. tostring(charIdentifier) .. '\nHouse ID: ' .. tostring(houseId) .. ' was sold for $' .. tostring(sellPrice))
+        Discord:sendMessage('House sold by characterId: ' .. tostring(characterId) .. '\nHouse ID: ' .. tostring(houseId) .. ' was sold for $' .. tostring(sellPrice))
 
         HousingRPC:Notify('bcc-housing:OwnsHouseClientHandler', { house = houseData, isOwner = false}, src)
         HousingRPC:Notify('bcc-housing:StopPropertyCheck', {}, src)
@@ -185,14 +178,13 @@ local function handleUnrentHouse(src, houseIdParam, cb)
         return
     end
 
-    local user = HousingUser(src)
-    local character = user and user.getUsedCharacter
-    if not user or not character then
+    local character = GetHousingCharacter(src)
+    if not character then
         if cbFn then cbFn(false, { error = 'no_character' }) end
         return
     end
 
-    local charIdentifier = character.charIdentifier
+    local characterId = character.characterId
 
     local result = DB.query('SELECT * FROM bcchousing WHERE houseid = ?', houseId)
         if not result or #result == 0 then
@@ -207,7 +199,7 @@ local function handleUnrentHouse(src, houseIdParam, cb)
         end
 
         local propertyKey = HousingProperty.KeyForRow(houseData)
-        if not HousingProperty.Holds(propertyKey, charIdentifier, 'tenant') then
+        if not HousingProperty.Holds(propertyKey, characterId, 'tenant') then
             NotifyClient(src, _U('noHouseOrNotOwner'), 4000, 'error')
             if cbFn then cbFn(false) end
             return
@@ -217,7 +209,7 @@ local function handleUnrentHouse(src, houseIdParam, cb)
         -- Refused while suspended: overdue rent is paid before the tenancy can end.
         local released = HousingProperty.Release(propertyKey,
             HousingProperty.RequestId('unrent', houseData.houseid, Housing.NewId()), src, 'housing.rent_ended',
-            { holderId = charIdentifier })
+            { holderId = characterId })
         if not released.ok then
             DBG:Error('handleUnrentHouse: property release failed', released.code, released.message)
             if released.code == 'property_unavailable' then NotifyClient(src, _U('taxesOverdue'), 4000, 'error') end
@@ -241,7 +233,7 @@ local function handleUnrentHouse(src, houseIdParam, cb)
         end
 
         NotifyClient(src, _U('rentalEndedSuccess'), 4000, 'success')
-        Discord:sendMessage('House rental ended by charIdentifier: ' .. tostring(charIdentifier) .. '\nHouse ID: ' .. tostring(houseId))
+        Discord:sendMessage('House rental ended by characterId: ' .. tostring(characterId) .. '\nHouse ID: ' .. tostring(houseId))
 
         HousingRPC:Notify('bcc-housing:StopPropertyCheck', {}, src)
         HousingRPC:Notify('bcc-housing:clearBlips', { houseId = houseId }, src)
@@ -294,7 +286,7 @@ local function makeOffer(src, houseIdParam, targetPlayerIdParam, salePriceParam,
     end
     local houseData = DB.one('SELECT * FROM bcchousing WHERE houseid = ?', houseId)
     if not houseData or houseData.ownershipStatus ~= 'purchased'
-        or not HousingProperty.Holds(HousingProperty.KeyForRow(houseData), seller.charIdentifier, 'owner') then
+        or not HousingProperty.Holds(HousingProperty.KeyForRow(houseData), seller.characterId, 'owner') then
         NotifyClient(src, _U('houseNotOwnedOrExist'), 4000, 'error')
         if cbFn then cbFn(false) end
         return
@@ -309,8 +301,8 @@ local function makeOffer(src, houseIdParam, targetPlayerIdParam, salePriceParam,
     local offerId = Housing.NewId()
     pendingOffers[offerId] = {
         id = offerId, houseId = houseId, price = salePrice, withInventory = withInventory == true,
-        sellerSource = src, sellerId = seller.charIdentifier, buyerSource = targetPlayerId,
-        buyerId = buyer.charIdentifier, expiresAt = os.time() + OFFER_TTL
+        sellerSource = src, sellerId = seller.characterId, buyerSource = targetPlayerId,
+        buyerId = buyer.characterId, expiresAt = os.time() + OFFER_TTL
     }
     HousingRPC:Notify('bcc-housing:SaleOffer', {
         offerId = offerId,
@@ -321,27 +313,27 @@ local function makeOffer(src, houseIdParam, targetPlayerIdParam, salePriceParam,
         expiresIn = OFFER_TTL
     }, targetPlayerId)
     NotifyClient(src, _U('saleOfferSent'), 4000, 'info')
-    DBG:Info('[SaleOffer]', offerId, 'house', houseId, 'from', seller.charIdentifier, 'to', buyer.charIdentifier, 'for', salePrice)
+    DBG:Info('[SaleOffer]', offerId, 'house', houseId, 'from', seller.characterId, 'to', buyer.characterId, 'for', salePrice)
     if cbFn then cbFn(true, { offerId = offerId }) end
 end
 
 local function completeSale(offer)
-    local seller = { charIdentifier = offer.sellerId }
+    local seller = { characterId = offer.sellerId }
     local buyer = GetHousingCharacter(offer.buyerSource)
     local houseData = DB.one('SELECT * FROM bcchousing WHERE houseid = ?', offer.houseId)
-    if not buyer or buyer.charIdentifier ~= offer.buyerId or not houseData then
+    if not buyer or buyer.characterId ~= offer.buyerId or not houseData then
         return false, 'houseNotOwnedOrExist'
     end
-    local ownedByBuyer = DB.query('SELECT houseid FROM bcchousing WHERE charidentifier = ?', buyer.charIdentifier) or {}
+    local ownedByBuyer = DB.query('SELECT houseid FROM bcchousing WHERE character_id = ?', buyer.characterId) or {}
     if #ownedByBuyer >= Config.Setup.MaxHousePerChar then
         return false, 'maxHouses'
     end
-    if not HousingEconomy.HasFunds(buyer.charIdentifier, 'dollars', offer.price) then
+    if not HousingEconomy.HasFunds(buyer.characterId, 'dollars', offer.price) then
         return false, 'noMoneyToBuyHouse'
     end
 
     local propertyKey = HousingProperty.KeyForRow(houseData)
-    local transferred = HousingProperty.Transfer(propertyKey, offer.sellerId, buyer.charIdentifier,
+    local transferred = HousingProperty.Transfer(propertyKey, offer.sellerId, buyer.characterId,
         HousingProperty.RequestId('sell-player', offer.id), offer.buyerSource)
     if not transferred.ok then
         DBG:Error('[SaleOffer] property transfer failed', transferred.code, transferred.message)
@@ -351,7 +343,7 @@ local function completeSale(offer)
     local paid = HousingEconomy.PayTo(buyer, offer.sellerId, 'dollars', offer.price, 'housing.sale',
         { type = 'housing_house', id = offer.houseId }, 'housing:sale:' .. offer.id)
     if not paid.ok then
-        local undone = HousingProperty.Transfer(propertyKey, buyer.charIdentifier, offer.sellerId,
+        local undone = HousingProperty.Transfer(propertyKey, buyer.characterId, offer.sellerId,
             HousingProperty.RequestId('sell-player-undo', offer.id), offer.buyerSource)
         if not undone.ok then
             print(('[bcc-housing] sale %s: payment failed and ownership could not be moved back: %s'):format(offer.id, tostring(undone.code)))
@@ -360,13 +352,13 @@ local function completeSale(offer)
     end
 
     if offer.withInventory then
-        DB.exec('UPDATE bcchousing SET charidentifier = ?, purchaseCurrencyType = 0 WHERE houseid = ?',
-            buyer.charIdentifier, offer.houseId)
+        DB.exec('UPDATE bcchousing SET character_id = ?, purchaseCurrencyType = 0 WHERE houseid = ?',
+            buyer.characterId, offer.houseId)
         SyncHouseDoors(offer.houseId) -- the locks now open for the buyer
     else
         DeleteHouseDoors(offer.houseId)
-        DB.exec('UPDATE bcchousing SET charidentifier = ?, furniture = "none", doors = "none", purchaseCurrencyType = 0 WHERE houseid = ?',
-            buyer.charIdentifier, offer.houseId)
+        DB.exec('UPDATE bcchousing SET character_id = ?, furniture = "none", doors = "none", purchaseCurrencyType = 0 WHERE houseid = ?',
+            buyer.characterId, offer.houseId)
     end
 
     local houseConfig = findHouseConfigByUniqueName(houseData.uniqueName)
@@ -375,9 +367,9 @@ local function completeSale(offer)
     end
     GiveHousePropertyDocument(offer.buyerSource, buyer, houseConfig, offer.houseId, houseData.ownershipStatus)
 
-    Discord:sendMessage(('House ID: %s was sold %s inventory by charIdentifier: %s to charIdentifier: %s for $%s'):format(
+    Discord:sendMessage(('House ID: %s was sold %s inventory by characterId: %s to characterId: %s for $%s'):format(
         tostring(offer.houseId), offer.withInventory and 'with' or 'without', tostring(offer.sellerId),
-        tostring(buyer.charIdentifier), tostring(offer.price)))
+        tostring(buyer.characterId), tostring(offer.price)))
     return true
 end
 
@@ -393,7 +385,7 @@ end)
 HousingRPC:Register('bcc-housing:RespondSaleOffer', function(params, cb, src)
     local offer = pendingOffers[tostring(params and params.offerId)]
     local buyer = GetHousingCharacter(src)
-    if not offer or not buyer or buyer.charIdentifier ~= offer.buyerId then
+    if not offer or not buyer or buyer.characterId ~= offer.buyerId then
         NotifyClient(src, _U('saleOfferExpired'), 4000, 'error')
         return cb(false)
     end
@@ -439,8 +431,8 @@ HousingRPC:Register('bcc-housing:RequestSoldHouses', function(params, cb, src)
     local character = GetHousingCharacter(src)
     if not character then return cb(false) end
     local soldHouses = {}
-    for _, row in ipairs(DB.query("SELECT houseid, amount FROM bcchousing_transactions WHERE identifier = ? AND status = 'pending'",
-        character.charIdentifier) or {}) do
+    for _, row in ipairs(DB.query("SELECT houseid, amount FROM bcchousing_transactions WHERE character_id = ? AND status = 'pending'",
+        character.characterId) or {}) do
         soldHouses[#soldHouses + 1] = { houseId = row.houseid, amount = tonumber(row.amount) or 0 }
     end
     cb(soldHouses)
@@ -450,10 +442,10 @@ end)
 HousingRPC:Register('bcc-housing:collectHouseSaleMoneyFromNpc', function(_, cb, src)
     local character = GetHousingCharacter(src)
     if not character then return cb(false, { error = 'no_character' }) end
-    local paid = HousingPayouts.RetryPending(character.charIdentifier)
+    local paid = HousingPayouts.RetryPending(character.characterId)
     if paid > 0 then
         NotifyClient(src, _U('collectedHouseSalesMoney', paid), 4000, 'success')
-        Discord:sendMessage('House sale payout retried for charIdentifier: ' .. tostring(character.charIdentifier) ..
+        Discord:sendMessage('House sale payout retried for characterId: ' .. tostring(character.characterId) ..
             '\nPaid $' .. tostring(paid) .. ' from house sales.')
         return cb(true, { amount = paid })
     end

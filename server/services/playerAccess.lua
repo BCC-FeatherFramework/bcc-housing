@@ -22,7 +22,7 @@ HousingRPC:Register("bcc-housing:GetPlayersWithAccess", function(params, cb, rec
             for _, characterId in ipairs(allowedIds) do
                 local firstname, lastname = HousingCharacters.GetName(tostring(characterId))
                 characterDetails[#characterDetails + 1] = {
-                    charidentifier = characterId,
+                    characterId = characterId,
                     firstname = firstname,
                     lastname = lastname
                 }
@@ -39,7 +39,7 @@ HousingRPC:Register("bcc-housing:GetPlayersWithAccess", function(params, cb, rec
 end)
 
 HousingRPC:Register('bcc-housing:NewPlayerGivenAccess', function(params, cb, src)
-    local id = params and params.charIdentifier
+    local id = params and params.characterId
     local houseid = params and params.houseId
     local recSource = params and params.recSource
 

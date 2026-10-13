@@ -345,7 +345,7 @@ function AdminManagementMenuHouseChose(houseInfo)
         _U("houseDetailsHouseID", houseInfo.houseid and tostring(houseInfo.houseid) or "N/A") .. "\n" ..
         _U("houseDetailsUniqueName", houseInfo.uniqueName and tostring(houseInfo.uniqueName) or "N/A") .. "\n" ..
         _U("houseDetailsOwnerName", ownerFirstName .. " " .. ownerLastName) .. "\n" ..
-        _U("houseDetailsOwnerID", houseInfo.charidentifier and tostring(houseInfo.charidentifier) or "N/A") .. "\n" ..
+        _U("houseDetailsOwnerID", houseInfo.character_id and tostring(houseInfo.character_id) or "N/A") .. "\n" ..
         _U("houseDetailsStatus", _U(tostring(houseInfo.ownershipStatus or "purchased"))) .. "\n" ..
         _U("houseDetailsPurchaseCurrency", purchaseCurrencyLabel) .. "\n" ..
         _U("housePurchasedAt", formatPurchasedAt(houseInfo.purchased_at_formatted or houseInfo.purchased_at)) .. "\n" ..

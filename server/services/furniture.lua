@@ -25,7 +25,7 @@ end
 
 local function characterHasHouseAccess(character, houseData)
     if not character or not houseData then return false end
-    if tostring(houseData.charidentifier) == tostring(character.charIdentifier) then
+    if tostring(houseData.character_id) == tostring(character.characterId) then
         return true
     end
 
@@ -33,7 +33,7 @@ local function characterHasHouseAccess(character, houseData)
     if not allowedIds then return false end
 
     for _, allowedId in ipairs(allowedIds) do
-        if tostring(allowedId) == tostring(character.charIdentifier) then
+        if tostring(allowedId) == tostring(character.characterId) then
             return true
         end
     end
@@ -235,12 +235,12 @@ HousingRPC:Register("bcc-housing:GetPlacedFurnitureList", function(params, cb, s
         return cb(false, "noCharacter")
     end
 
-    local result = DB.query("SELECT furniture, charidentifier FROM bcchousing WHERE houseid=?", houseId)
+    local result = DB.query("SELECT furniture, character_id FROM bcchousing WHERE houseid=?", houseId)
     if not result or not result[1] then
         return cb(false, "houseNotFound")
     end
 
-    if tostring(result[1].charidentifier) ~= tostring(character.charIdentifier) then
+    if tostring(result[1].character_id) ~= tostring(character.characterId) then
         return cb(false, "notOwner")
     end
 
@@ -275,12 +275,12 @@ HousingRPC:Register("bcc-housing:UpdatePlacedFurniture", function(params, cb, sr
         return cb(false, "noCharacter")
     end
 
-    local result = DB.query("SELECT furniture, charidentifier FROM bcchousing WHERE houseid=?", houseId)
+    local result = DB.query("SELECT furniture, character_id FROM bcchousing WHERE houseid=?", houseId)
     if not result or not result[1] then
         return cb(false, "houseNotFound")
     end
 
-    if tostring(result[1].charidentifier) ~= tostring(character.charIdentifier) then
+    if tostring(result[1].character_id) ~= tostring(character.characterId) then
         return cb(false, "notOwner")
     end
 
@@ -335,11 +335,11 @@ HousingRPC:Register('bcc-housing:FurnSoldRemoveFromTable', function(params, cb, 
     end
 
     local result = DB.query(
-        "SELECT furniture, charidentifier, ownershipStatus FROM bcchousing WHERE houseid = ?",
+        "SELECT furniture, character_id, ownershipStatus FROM bcchousing WHERE houseid = ?",
         houseId
     )
     local houseData = result and result[1]
-    if not houseData or tostring(houseData.charidentifier) ~= tostring(character.charIdentifier) then
+    if not houseData or tostring(houseData.character_id) ~= tostring(character.characterId) then
         NotifyClient(src, _U("noAccessToHouse"), 4000, "error")
         if cb then cb(false) end
         return
@@ -362,8 +362,8 @@ HousingRPC:Register('bcc-housing:FurnSoldRemoveFromTable', function(params, cb, 
     table.remove(furniture, furnitureIndex)
     local updatedFurniture = #furniture > 0 and json.encode(furniture) or 'none'
     local affectedRows = DB.exec(
-        "UPDATE bcchousing SET furniture = ? WHERE houseid = ? AND charidentifier = ? AND furniture = ?",
-        updatedFurniture, houseId, character.charIdentifier, houseData.furniture
+        "UPDATE bcchousing SET furniture = ? WHERE houseid = ? AND character_id = ? AND furniture = ?",
+        updatedFurniture, houseId, character.characterId, houseData.furniture
     )
     if not affectedRows or affectedRows <= 0 then
         NotifyClient(src, _U("furnNotSold"), 4000, "error")
@@ -373,7 +373,7 @@ HousingRPC:Register('bcc-housing:FurnSoldRemoveFromTable', function(params, cb, 
 
     -- The agent buys it back: new money in the wallet (policy-gated supply).
     if sellPrice > 0 then
-        local paid = HousingEconomy.Issue(character.charIdentifier, 'dollars', sellPrice, 'housing.furniture_sold',
+        local paid = HousingEconomy.Issue(character.characterId, 'dollars', sellPrice, 'housing.furniture_sold',
             { type = 'housing_house', id = houseId }, 'housing:furniture-sell:' .. Housing.NewId())
         if not paid.ok then
             -- Put the furniture back so nothing is lost.
@@ -386,7 +386,7 @@ HousingRPC:Register('bcc-housing:FurnSoldRemoveFromTable', function(params, cb, 
     end
     NotifyClient(src, _U("furnSold"), 4000, "success")
     Discord:sendMessage(_U("furnWebHookSold") ..
-        character.charIdentifier ..
+        character.characterId ..
         _U("furnWebHookSoldModel") ..
         tostring(soldFurniture.model) .. _U("furnWebHookSoldPrice") .. tostring(sellPrice))
 
@@ -400,14 +400,12 @@ HousingRPC:Register('bcc-housing:FurnSoldRemoveFromTable', function(params, cb, 
 end)
 
 function getCharacter(source)
-    local user = HousingUser(source)
-    if not user then return nil end
-    return user.getUsedCharacter
+    return GetHousingCharacter(source)
 end
 
-local function loadOwnedFurniture(charIdentifier)
-    if not charIdentifier then return {} end
-    local result = DB.query("SELECT items FROM bcchousing_ownedfurniture WHERE charidentifier=?", charIdentifier)
+local function loadOwnedFurniture(characterId)
+    if not characterId then return {} end
+    local result = DB.query("SELECT items FROM bcchousing_ownedfurniture WHERE character_id=?", characterId)
 
     if result and result[1] and result[1].items and result[1].items ~= '' then
         local ok, decoded = pcall(json.decode, result[1].items)
@@ -419,14 +417,14 @@ local function loadOwnedFurniture(charIdentifier)
     return {}
 end
 
-local function saveOwnedFurniture(charIdentifier, items)
-    if not charIdentifier then return end
+local function saveOwnedFurniture(characterId, items)
+    if not characterId then return end
     local encoded = json.encode(items or {})
     local updated = DB.exec(
-    "UPDATE bcchousing_ownedfurniture SET items=? WHERE charidentifier=?", encoded, charIdentifier)
+    "UPDATE bcchousing_ownedfurniture SET items=? WHERE character_id=?", encoded, characterId)
     if not updated or updated == 0 then
         DB.insert(
-        "INSERT INTO bcchousing_ownedfurniture (charidentifier, items) VALUES (?, ?)", charIdentifier, encoded)
+        "INSERT INTO bcchousing_ownedfurniture (character_id, items) VALUES (?, ?)", characterId, encoded)
     end
 end
 
@@ -443,7 +441,7 @@ CreateThread(function()
         local character = getCharacter(src)
         if not character then return end
 
-        local ownedItems = loadOwnedFurniture(character.charIdentifier)
+        local ownedItems = loadOwnedFurniture(character.characterId)
         HousingRPC:Notify("bcc-housing:OpenFurnitureBook", { ownedFurniture = ownedItems }, src)
         HousingInventory.Close(src)
     end)
@@ -481,7 +479,7 @@ HousingRPC:Register("bcc-housing:RequestOwnedFurniture", function(params, cb, sr
         return cb(false)
     end
 
-    local ownedItems = loadOwnedFurniture(character.charIdentifier)
+    local ownedItems = loadOwnedFurniture(character.characterId)
     HousingRPC:Notify("bcc-housing:OwnedFurnitureSync", { ownedItems = ownedItems }, src)
     cb(true)
 end)
@@ -522,7 +520,7 @@ HousingRPC:Register("bcc-housing:PurchaseFurnitureItem", function(params, cb, sr
         NotifyClient(src, _U(HousingEconomy.MessageKey(paid, 'dollars')), 4000, "error")
         return cb(false)
     end
-    local ownedItems = loadOwnedFurniture(character.charIdentifier)
+    local ownedItems = loadOwnedFurniture(character.characterId)
 
     local entry = {
         id          = generateFurnitureId(),
@@ -534,13 +532,13 @@ HousingRPC:Register("bcc-housing:PurchaseFurnitureItem", function(params, cb, sr
     }
 
     table.insert(ownedItems, entry)
-    saveOwnedFurniture(character.charIdentifier, ownedItems)
+    saveOwnedFurniture(character.characterId, ownedItems)
 
     HousingRPC:Notify("bcc-housing:OwnedFurnitureSync", { ownedItems = ownedItems }, src)
     -- Discord logging
     Discord:sendMessage(
         _U("furnWebHookBought")
-        .. tostring(character.charIdentifier)
+        .. tostring(character.characterId)
         .. _U("furnWebHookBoughtModel")
         .. tostring(modelName)
         .. _U("furnWebHookSoldPrice")
@@ -567,7 +565,7 @@ HousingRPC:Register("bcc-housing:PlaceOwnedFurniture", function(params, cb, src)
     end
 
     local houseResult = DB.query(
-        "SELECT charidentifier, allowed_ids, taxes_collected FROM bcchousing WHERE houseid = ?",
+        "SELECT character_id, allowed_ids, taxes_collected FROM bcchousing WHERE houseid = ?",
         houseId
     )
     local houseData = houseResult and houseResult[1]
@@ -582,7 +580,7 @@ HousingRPC:Register("bcc-housing:PlaceOwnedFurniture", function(params, cb, src)
         return cb(false)
     end
 
-    local ownedItems = loadOwnedFurniture(character.charIdentifier)
+    local ownedItems = loadOwnedFurniture(character.characterId)
     local ownedIndex, ownedEntry = nil, nil
     for idx, entry in ipairs(ownedItems) do
         if entry.id == ownedId then
@@ -605,7 +603,7 @@ HousingRPC:Register("bcc-housing:PlaceOwnedFurniture", function(params, cb, src)
     end
 
     table.remove(ownedItems, ownedIndex)
-    saveOwnedFurniture(character.charIdentifier, ownedItems)
+    saveOwnedFurniture(character.characterId, ownedItems)
 
     placementData.displayName = ownedEntry.displayName
     placementData.sellprice   = ownedEntry.sellprice
@@ -616,7 +614,7 @@ HousingRPC:Register("bcc-housing:PlaceOwnedFurniture", function(params, cb, src)
 
     Discord:sendMessage(
         _U("furnWebHookPlaced")
-        .. tostring(character.charIdentifier)
+        .. tostring(character.characterId)
         .. _U("furnWebHookBoughtModel")
         .. tostring(placementData.model)
     )

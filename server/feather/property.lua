@@ -1,5 +1,5 @@
 -- bcc-housing's boundary to feather-property: who owns or rents a house or a
--- hotel room is a Property interest, not a column here. bcchousing.charidentifier
+-- hotel room is a Property interest, not a column here. bcchousing.character_id
 -- and bcchousinghotels only cache the holder for fast lookups; Property wins, and
 -- the start-up reconciliation corrects the cache.
 --
@@ -329,7 +329,7 @@ end
 -- reported (it is not deleted automatically).
 function HousingProperty.Reconcile()
     local fixed, orphaned = 0, 0
-    for _, row in ipairs(DB.query('SELECT houseid, charidentifier, uniqueName, property_id FROM bcchousing') or {}) do
+    for _, row in ipairs(DB.query('SELECT houseid, character_id, uniqueName, property_id FROM bcchousing') or {}) do
         local key = HousingProperty.KeyForRow(row)
         local snapshot = key and HousingProperty.Get(key)
         if snapshot and snapshot.ok then
@@ -337,8 +337,8 @@ function HousingProperty.Reconcile()
             if row.property_id ~= snapshot.value.propertyId then
                 DB.exec('UPDATE bcchousing SET property_id = ? WHERE houseid = ?', snapshot.value.propertyId, row.houseid)
             end
-            if holder and holder.characterId ~= row.charidentifier then
-                DB.exec('UPDATE bcchousing SET charidentifier = ? WHERE houseid = ?', holder.characterId, row.houseid)
+            if holder and holder.characterId ~= row.character_id then
+                DB.exec('UPDATE bcchousing SET character_id = ? WHERE houseid = ?', holder.characterId, row.houseid)
                 fixed = fixed + 1
             elseif not holder then
                 orphaned = orphaned + 1
@@ -385,7 +385,7 @@ end)
 -- Console: HousingPropertyStatus <houseid>
 RegisterCommand('HousingPropertyStatus', function(source, args)
     if source ~= 0 then return end
-    local row = DB.one('SELECT houseid, charidentifier, uniqueName, property_id FROM bcchousing WHERE houseid = ?', tonumber(args[1]))
+    local row = DB.one('SELECT houseid, character_id, uniqueName, property_id FROM bcchousing WHERE houseid = ?', tonumber(args[1]))
     if not row then return print('[bcc-housing] Usage: HousingPropertyStatus <houseid> (house row not found)') end
     local key = HousingProperty.KeyForRow(row)
     local snapshot = HousingProperty.Get(key)
@@ -393,5 +393,5 @@ RegisterCommand('HousingPropertyStatus', function(source, args)
     local holder = HousingProperty.Holder(snapshot.value)
     print(('[bcc-housing] house %s key=%s property=%s status=%s holder=%s (%s) cache=%s'):format(
         row.houseid, key, snapshot.value.propertyId, snapshot.value.status,
-        holder and holder.characterId or 'none', holder and holder.interestType or '-', tostring(row.charidentifier)))
+        holder and holder.characterId or 'none', holder and holder.interestType or '-', tostring(row.character_id)))
 end, true)

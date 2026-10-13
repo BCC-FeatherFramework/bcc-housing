@@ -25,7 +25,7 @@ local function mayEnterHouse(src, houseId)
     local row = character and DB.one('SELECT allowed_ids FROM bcchousing WHERE houseid = ?', houseId)
     local ok, allowed = pcall(json.decode, row and row.allowed_ids or '[]')
     for _, id in ipairs(ok and type(allowed) == 'table' and allowed or {}) do
-        if tostring(id) == character.charIdentifier then return true end
+        if tostring(id) == character.characterId then return true end
     end
     return false
 end
@@ -37,11 +37,11 @@ HousingRPC:Register('bcc-housing:EnterInstance', function(params, cb, src)
     local key
     if params.kind == 'hotel' then
         local hotelId = tonumber(params.hotelId)
-        if not hotelId or not HousingProperty.Holds(HousingProperty.HotelKey(hotelId), character.charIdentifier, 'tenant') then
+        if not hotelId or not HousingProperty.Holds(HousingProperty.HotelKey(hotelId), character.characterId, 'tenant') then
             NotifyClient(src, _U('hotelNotOwned'), 4000, 'error')
             return cb(false, { error = 'not_allowed' })
         end
-        key = ('hotel:%d:%s'):format(hotelId, character.charIdentifier)
+        key = ('hotel:%d:%s'):format(hotelId, character.characterId)
     elseif params.kind == 'house' then
         local houseId = tonumber(params.houseId)
         if not houseId or not mayEnterHouse(src, houseId) then

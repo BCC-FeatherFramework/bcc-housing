@@ -49,13 +49,7 @@ local function handleHousePurchase(src, houseCoords, moneyTypeParam, cb)
         return
     end
 
-    local user = HousingUser(src)
-    if not user then
-        if cbFn then cbFn(false, { error = 'no_user' }) end
-        return
-    end
-
-    local character = user.getUsedCharacter
+    local character = GetHousingCharacter(src)
     if not character then
         if cbFn then cbFn(false, { error = 'no_character' }) end
         return
@@ -66,7 +60,7 @@ local function handleHousePurchase(src, houseCoords, moneyTypeParam, cb)
 
     local houseCoordsJson = json.encode(houseCoords)
 
-    local ownedHouses = DB.query('SELECT * FROM bcchousing WHERE charidentifier=?', character.charIdentifier)
+    local ownedHouses = DB.query('SELECT * FROM bcchousing WHERE character_id=?', character.characterId)
     if #ownedHouses >= Config.Setup.MaxHousePerChar then
         NotifyClient(src, _U('youOwnMaximum'), 4000, 'error')
         if cbFn then cbFn(false) end
@@ -116,7 +110,7 @@ local function handleHousePurchase(src, houseCoords, moneyTypeParam, cb)
         return
     end
     -- Early check for a friendly message; the payment itself is what decides.
-    if moneyAmount > 0 and not HousingEconomy.HasFunds(character.charIdentifier, currency, moneyAmount) then
+    if moneyAmount > 0 and not HousingEconomy.HasFunds(character.characterId, currency, moneyAmount) then
         NotifyClient(src, _U(currency == 'gold' and 'notEnoughGold' or 'notEnoughMoney'), 4000, 'error')
         if cbFn then cbFn(false) end
         return
@@ -140,7 +134,7 @@ local function handleHousePurchase(src, houseCoords, moneyTypeParam, cb)
     -- when someone already holds it, so two buyers can never both get it.
     local propertyKey = HousingProperty.HouseKey(selectedHouse.uniqueName)
     local purchaseId = Housing.NewId()
-    local assigned = HousingProperty.Assign(propertyKey, character.charIdentifier,
+    local assigned = HousingProperty.Assign(propertyKey, character.characterId,
         isRental and 'tenant' or 'owner', HousingProperty.RequestId('purchase', selectedHouse.uniqueName, purchaseId),
         src, isRental and 'housing.rent' or 'housing.purchase')
     if not assigned.ok then
@@ -153,7 +147,7 @@ local function handleHousePurchase(src, houseCoords, moneyTypeParam, cb)
 
     local insertOk, houseId = pcall(DB.insert, [[
         INSERT INTO `bcchousing`
-            (`charidentifier`, `house_coords`, `house_radius_limit`, `doors`, `invlimit`, `tax_amount`,
+            (`character_id`, `house_coords`, `house_radius_limit`, `doors`, `invlimit`, `tax_amount`,
              `tpInt`, `tpInstance`, `uniqueName`, `ownershipStatus`, `purchaseCurrencyType`,
              `poly_points`, `poly_min_z`, `poly_max_z`, `purchased_at`, `property_id`)
         SELECT
@@ -161,7 +155,7 @@ local function handleHousePurchase(src, houseCoords, moneyTypeParam, cb)
             ?, ?, ?, ?, ?,
             ?, ?, ?, NOW(), ?
         WHERE NOT EXISTS (SELECT 1 FROM `bcchousing` WHERE `uniqueName` = ?)
-    ]], character.charIdentifier, houseCoordsJson, houseRadiusLimit, '[]', selectedHouse.invLimit, taxAmount,
+    ]], character.characterId, houseCoordsJson, houseRadiusLimit, '[]', selectedHouse.invLimit, taxAmount,
         selectedHouse.tpInt, selectedHouse.tpInstance, selectedHouse.uniqueName, ownershipStatus, currencyType,
         polyPoints, polyMinZ, polyMaxZ, assigned.value.propertyId, selectedHouse.uniqueName)
     pendingHousePurchases[selectedHouse.uniqueName] = nil
@@ -190,7 +184,7 @@ local function handleHousePurchase(src, houseCoords, moneyTypeParam, cb)
         end
     end
 
-    insertHouseDoors(selectedHouse.doors, character.charIdentifier, houseId, selectedHouse.uniqueName)
+    insertHouseDoors(selectedHouse.doors, character.characterId, houseId, selectedHouse.uniqueName)
     GiveHousePropertyDocument(src, character, selectedHouse, houseId, ownershipStatus)
 
     HousingRPC:Notify('bcc-housing:clearBlips', { houseId = selectedHouse.houseId }, src)
@@ -209,7 +203,7 @@ local function handleHousePurchase(src, houseCoords, moneyTypeParam, cb)
         NotifyClient(src, _U('houseRentSuccess', selectedHouse.name, displayAmount), 4000, 'success')
     end
 
-    Discord:sendMessage('House purchased by charIdentifier: ' .. tostring(character.charIdentifier) ..
+    Discord:sendMessage('House purchased by characterId: ' .. tostring(character.characterId) ..
         '\nHouse: ' .. selectedHouse.name .. ' was **' .. ownershipStatus .. '** for ' .. displayAmount ..
         '\nCharacter Name: ' .. tostring(character.firstname) .. ' ' .. tostring(character.lastname))
 
@@ -226,7 +220,7 @@ end)
 -- Locks the configured doors of a house for its new holder through the
 -- bcc-doorlocks server API (bcc-housing never writes the doorlocks table) and
 -- stores their door IDs on the house row.
-function insertHouseDoors(doors, charidentifier, houseId, uniqueName)
+function insertHouseDoors(doors, characterId, houseId, uniqueName)
     local houseConfig = nil
     for _, house in pairs(Houses) do
         if house.uniqueName == uniqueName then
@@ -246,11 +240,11 @@ function insertHouseDoors(doors, charidentifier, houseId, uniqueName)
         if existing then
             existing:UpdateAllowedJobs({})
             existing:UpdateKeyItem('none')
-            existing:UpdateAllowedIds({ charidentifier })
+            existing:UpdateAllowedIds({ characterId })
             existing:UpdateLockStatus(locked)
             doorIds[#doorIds + 1] = existing.id
         else
-            local doorId = DoorLocksAPI:AddDoor(door.doorinfo, {}, 'none', { charidentifier }, locked)
+            local doorId = DoorLocksAPI:AddDoor(door.doorinfo, {}, 'none', { characterId }, locked)
             if doorId then
                 doorIds[#doorIds + 1] = doorId
             else

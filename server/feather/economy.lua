@@ -97,7 +97,7 @@ end
 
 -- Character pays an amount to the system sink.
 function HousingEconomy.Pay(character, currency, amount, reasonCode, ref, idempotencyKey)
-    local wallet = HousingEconomy.Wallet(character.charIdentifier, currency)
+    local wallet = HousingEconomy.Wallet(character.characterId, currency)
     if not wallet.ok then return wallet end
     local target = sink(currency)
     if not target.ok then return target end
@@ -112,7 +112,7 @@ function HousingEconomy.Pay(character, currency, amount, reasonCode, ref, idempo
         referenceId = referenceId,
         idempotencyKey = idempotencyKey
     }, {
-        actorCharacterId = character.charIdentifier,
+        actorCharacterId = character.characterId,
         actorAccountId = character.accountId,
         correlationId = idempotencyKey
     }))
@@ -120,7 +120,7 @@ end
 
 -- One character pays another (wallet to wallet).
 function HousingEconomy.PayTo(payer, payeeCharacterId, currency, amount, reasonCode, ref, idempotencyKey)
-    local from = HousingEconomy.Wallet(payer.charIdentifier, currency)
+    local from = HousingEconomy.Wallet(payer.characterId, currency)
     if not from.ok then return from end
     local to = HousingEconomy.Wallet(payeeCharacterId, currency)
     if not to.ok then return to end
@@ -135,7 +135,7 @@ function HousingEconomy.PayTo(payer, payeeCharacterId, currency, amount, reasonC
         referenceId = referenceId,
         idempotencyKey = idempotencyKey
     }, {
-        actorCharacterId = payer.charIdentifier,
+        actorCharacterId = payer.characterId,
         actorAccountId = payer.accountId,
         correlationId = idempotencyKey
     }))

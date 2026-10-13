@@ -31,7 +31,7 @@ function IsHousingAdmin(src)
         DBG:Info('[admin] allowed', src, reason)
         return true
     end
-    if HousingJobs.HoldsAny(character.charIdentifier, admin.jobs, admin.jobRequireOnDuty) then
+    if HousingJobs.HoldsAny(character.characterId, admin.jobs, admin.jobRequireOnDuty) then
         DBG:Info('[admin] allowed by job', src)
         return true
     end
@@ -48,7 +48,7 @@ function IsHouseOwner(src, houseId)
 
     local row = DB.one('SELECT houseid, uniqueName FROM bcchousing WHERE houseid = ?', numericHouseId)
     if not row then return false end
-    return HousingProperty.Holds(HousingProperty.KeyForRow(row), character.charIdentifier) == true
+    return HousingProperty.Holds(HousingProperty.KeyForRow(row), character.characterId) == true
 end
 
 function IsDoorOwnedByCharacter(src, doorId)
@@ -56,9 +56,9 @@ function IsDoorOwnedByCharacter(src, doorId)
     local numericDoorId = tonumber(doorId)
     if not character or not numericDoorId then return false end
 
-    local houses = DB.query('SELECT houseid, uniqueName, charidentifier, doors FROM bcchousing WHERE doors IS NOT NULL AND doors != ?', 'none') or {}
+    local houses = DB.query('SELECT houseid, uniqueName, character_id, doors FROM bcchousing WHERE doors IS NOT NULL AND doors != ?', 'none') or {}
     for _, house in ipairs(houses) do
-        if HousingProperty.Holds(HousingProperty.KeyForRow(house), character.charIdentifier) then
+        if HousingProperty.Holds(HousingProperty.KeyForRow(house), character.characterId) then
             local ok, doors = pcall(json.decode, house.doors)
             if ok and type(doors) == 'table' then
                 for _, houseDoorId in ipairs(doors) do
@@ -88,7 +88,7 @@ HousingRPC:Register('bcc-housing:GetPlayers', function(params, cb, src)
                 table.insert(data, {
                     serverId = playerId,
                     PlayerName = Character.firstname .. ' ' .. Character.lastname,
-                    staticid = Character.charIdentifier,
+                    staticid = Character.characterId,
                 })
             end
         end

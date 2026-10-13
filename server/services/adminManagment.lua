@@ -26,17 +26,17 @@ local function collectAdminHouseData()
     local allHouses = {}
 
     for _, houseInfo in ipairs(result) do
-        local houseCharIdentifier = houseInfo.charidentifier
+        local houseCharacterId = houseInfo.character_id
         houseInfo.purchased_at_formatted = formatPurchasedAt(houseInfo.purchased_at)
-        DBG:Info('Processing house with ID:', houseInfo.houseid, 'and character identifier:', houseCharIdentifier)
+        DBG:Info('Processing house with ID:', houseInfo.houseid, 'and character identifier:', houseCharacterId)
 
-        if houseCharIdentifier then
+        if houseCharacterId then
             -- Names come from the Feather character profile (online or offline).
-            houseInfo.firstName, houseInfo.lastName = HousingCharacters.GetName(tostring(houseCharIdentifier))
+            houseInfo.firstName, houseInfo.lastName = HousingCharacters.GetName(tostring(houseCharacterId))
         else
             houseInfo.firstName = 'Unknown'
             houseInfo.lastName = 'Unknown'
-            DBG:Info('Warning: houseCharIdentifier is missing for house ID:', houseInfo.houseid)
+            DBG:Info('Warning: houseCharacterId is missing for house ID:', houseInfo.houseid)
         end
 
         table.insert(allHouses, houseInfo)

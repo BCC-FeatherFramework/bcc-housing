@@ -67,8 +67,8 @@ end
 
 -- The hotel room row of a character (created on first use).
 local function hotelRoomId(hotelId, characterId)
-    DB.exec('INSERT IGNORE INTO bcchousing_hotel_rooms (hotel_id, charidentifier) VALUES (?, ?)', hotelId, characterId)
-    return tonumber(DB.value('SELECT id FROM bcchousing_hotel_rooms WHERE hotel_id = ? AND charidentifier = ?',
+    DB.exec('INSERT IGNORE INTO bcchousing_hotel_rooms (hotel_id, character_id) VALUES (?, ?)', hotelId, characterId)
+    return tonumber(DB.value('SELECT id FROM bcchousing_hotel_rooms WHERE hotel_id = ? AND character_id = ?',
         hotelId, characterId))
 end
 

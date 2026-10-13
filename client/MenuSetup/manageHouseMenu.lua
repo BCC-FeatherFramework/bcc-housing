@@ -40,7 +40,7 @@ end
 local function afterGivingAccess(houseId, playerId, playerServerId, completion)
     if houseId and playerId and playerServerId then
         local success = HousingRPC:CallAsync('bcc-housing:NewPlayerGivenAccess', {
-            charIdentifier = playerId,
+            characterId = playerId,
             houseId = houseId,
             recSource = playerServerId
         })
@@ -464,12 +464,12 @@ function PlayerListMenuForRemoveAccess(houseId, callback, context)
         end
 
         for k, v in pairs(rplayers) do
-            DBG:Info("Adding button for player ID: " .. tostring(v.charidentifier)) -- Ensure charidentifier is correct
+            DBG:Info("Adding button for player ID: " .. tostring(v.characterId))
             playerListRemoveMenuPage:RegisterElement("button", {
                 label = v.firstname .. " " .. v.lastname,                           -- Displaying player's name
                 style = {}
             }, function()
-                afterRemoveAccess(houseId, v.charidentifier)
+                afterRemoveAccess(houseId, v.characterId)
                 if HousingAccessMenu then
                     HousingAccessMenu:RouteTo()
                 else
@@ -849,7 +849,7 @@ function OpenHousingMainMenu(houseId, isOwner, ownershipStatus, taxPaymentReleas
 
                                             for _, player in ipairs(players) do
                                                 giveAccessPage:RegisterElement('button', {
-                                                    label = "ID: " .. tostring(player.charidentifier) ..
+                                                    label = "ID: " .. tostring(player.characterId) ..
                                                         " Name: " .. player.firstname .. " " .. player.lastname,
                                                     style = {}
                                                 }, function()
@@ -859,7 +859,7 @@ function OpenHousingMainMenu(houseId, isOwner, ownershipStatus, taxPaymentReleas
                                                     end
 
                                                     HousingRPC:Call("bcc-housing:GiveAccessToDoor",
-                                                        { doorId = door.doorid, userId = player.charidentifier },
+                                                        { doorId = door.doorid, userId = player.characterId },
                                                         function(success)
                                                             if success then
                                                                 BCCHousingMenu:Close()
@@ -919,7 +919,7 @@ function OpenHousingMainMenu(houseId, isOwner, ownershipStatus, taxPaymentReleas
 
                                             for _, player in ipairs(players) do
                                                 removeAccessPage:RegisterElement('button', {
-                                                    label = "ID: " .. tostring(player.charidentifier) ..
+                                                    label = "ID: " .. tostring(player.characterId) ..
                                                         " Name: " .. player.firstname .. " " .. player.lastname,
                                                     style = {}
                                                 }, function()
@@ -929,7 +929,7 @@ function OpenHousingMainMenu(houseId, isOwner, ownershipStatus, taxPaymentReleas
                                                     end
 
                                                     HousingRPC:Call("bcc-housing:RemoveAccessFromDoor",
-                                                        { doorId = door.doorid, userId = player.charidentifier },
+                                                        { doorId = door.doorid, userId = player.characterId },
                                                         function(success)
                                                             if success then
                                                                 doorOptionsPage:RouteTo()

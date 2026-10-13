@@ -140,7 +140,7 @@ local function sendTaxWebhook(house, status, currency)
 end
 
 local function notifyHolder(row, message)
-    local src = row.charidentifier and HousingCharacters.FindSource(row.charidentifier)
+    local src = row.character_id and HousingCharacters.FindSource(row.character_id)
     if src then NotifyClient(src, message, 6000, 'error') end
 end
 
@@ -178,12 +178,12 @@ local function processHouse(row, currentDate)
     end
 
     local currency = HousingTaxes.Currency(row)
-    if not currency or type(row.charidentifier) ~= 'string' then
+    if not currency or type(row.character_id) ~= 'string' then
         DBG:Warning('[Taxes] house', row.houseid, 'has no payable currency or holder')
         return
     end
     -- One key per house and due date: a restart on the due day never charges twice.
-    local paid = HousingEconomy.Pay({ charIdentifier = row.charidentifier }, currency, taxAmount, reasonFor(row),
+    local paid = HousingEconomy.Pay({ characterId = row.character_id }, currency, taxAmount, reasonFor(row),
         { type = 'housing_house', id = row.houseid }, ('housing:tax:%s:%s'):format(row.houseid, dueKey))
     if paid.ok then
         DB.exec("UPDATE bcchousing SET taxes_collected = 'true', last_tax_processed_at = ? WHERE houseid = ?", dueKey, row.houseid)

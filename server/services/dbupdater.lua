@@ -11,6 +11,21 @@ local function daysInMonth(year, month)
     return 31
 end
 
+-- Tables made before 3.0.0 named the character column after VORP (charidentifier,
+-- identifier on the payout queue). Renames it to character_id, keeping the data.
+local function renameCharacterColumn(tableName, oldName)
+    local exists = tonumber(DB.value([[
+        SELECT COUNT(*) FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?
+    ]], tableName, oldName)) or 0
+    if exists > 0 then
+        local renamed, problem = pcall(DB.exec,
+            ('ALTER TABLE `%s` CHANGE COLUMN `%s` `character_id` CHAR(36) NOT NULL'):format(tableName, oldName))
+        print(renamed and ('[bcc-housing] database: %s.%s renamed to character_id'):format(tableName, oldName)
+            or ('[bcc-housing] database: renaming %s.%s failed: %s'):format(tableName, oldName, tostring(problem)))
+    end
+end
+
 local function getDefaultPurchasedAtFromTaxDay()
     local taxDay = tonumber(Config.TaxDay) or 1
     taxDay = math.max(1, math.min(taxDay, 31))
@@ -30,10 +45,10 @@ end
 CreateThread(function()
     DB.awaitReady()
     -- Create the bcchousing table if it doesn't exist. Character columns hold Feather
-    -- character UUIDs; charidentifier caches the holder, feather-property is the truth.
+    -- character UUIDs; bcchousing.character_id caches the holder, feather-property is the truth.
     DB.exec([[
         CREATE TABLE IF NOT EXISTS `bcchousing` (
-            `charidentifier` varchar(50) NOT NULL,
+            `character_id` CHAR(36) NOT NULL,
             `house_coords` LONGTEXT NOT NULL,
             `house_radius_limit` varchar(100) NOT NULL,
             `houseid` int NOT NULL AUTO_INCREMENT,
@@ -81,9 +96,9 @@ CreateThread(function()
     -- Create the bcchousinghotels table if it doesn't exist
     DB.exec([[
         CREATE TABLE IF NOT EXISTS `bcchousinghotels` (
-            `charidentifier` varchar(50) NOT NULL,
+            `character_id` CHAR(36) NOT NULL,
             `hotels` LONGTEXT NOT NULL DEFAULT 'none',
-            PRIMARY KEY (`charidentifier`)
+            PRIMARY KEY (`character_id`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     ]])
 
@@ -93,7 +108,7 @@ CreateThread(function()
         CREATE TABLE IF NOT EXISTS `bcchousing_transactions` (
             `id` int(11) NOT NULL AUTO_INCREMENT,
             `houseid` int(11) NOT NULL,
-            `identifier` varchar(50) NOT NULL,
+            `character_id` CHAR(36) NOT NULL,
             `amount` DECIMAL(14,2) NOT NULL,
             `currency` varchar(16) NOT NULL DEFAULT 'dollars',
             `reason` varchar(64) NOT NULL DEFAULT 'housing.sold_to_agent',
@@ -102,7 +117,7 @@ CreateThread(function()
             `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (`id`),
             UNIQUE KEY `uq_bcchousing_payout_key` (`idempotency_key`),
-            KEY `idx_bcchousing_payout_pending` (`status`, `identifier`)
+            KEY `idx_bcchousing_payout_pending` (`status`, `character_id`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
     ]])
 
@@ -111,19 +126,25 @@ CreateThread(function()
         CREATE TABLE IF NOT EXISTS `bcchousing_hotel_rooms` (
             `id` int(11) NOT NULL AUTO_INCREMENT,
             `hotel_id` int(11) NOT NULL,
-            `charidentifier` varchar(50) NOT NULL,
+            `character_id` CHAR(36) NOT NULL,
             PRIMARY KEY (`id`),
-            UNIQUE KEY `uq_bcchousing_hotel_room` (`hotel_id`, `charidentifier`)
+            UNIQUE KEY `uq_bcchousing_hotel_room` (`hotel_id`, `character_id`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     ]])
 
     DB.exec([[
         CREATE TABLE IF NOT EXISTS `bcchousing_ownedfurniture` (
-            `charidentifier` varchar(50) NOT NULL,
+            `character_id` CHAR(36) NOT NULL,
             `items` LONGTEXT NOT NULL DEFAULT '[]',
-            PRIMARY KEY (`charidentifier`)
+            PRIMARY KEY (`character_id`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     ]])
+
+    renameCharacterColumn('bcchousing', 'charidentifier')
+    renameCharacterColumn('bcchousinghotels', 'charidentifier')
+    renameCharacterColumn('bcchousing_transactions', 'identifier')
+    renameCharacterColumn('bcchousing_hotel_rooms', 'charidentifier')
+    renameCharacterColumn('bcchousing_ownedfurniture', 'charidentifier')
 
     -- Furniture spawned before a restart belongs to nobody now.
     DB.exec("UPDATE `bcchousing` SET `player_source_spawnedfurn` = 'none' WHERE `player_source_spawnedfurn` <> 'none'")

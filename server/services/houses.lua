@@ -155,13 +155,7 @@ local function handleCreationDBInsert(src, tpHouse, owner, radius, doors, houseC
     local taxesValue = tonumber(taxAmount)
     local taxes = (taxesValue and taxesValue > 0) and taxesValue or 0
 
-    local user = HousingUser(src)
-    if not user then
-        if cbFn then cbFn(false, { error = 'no_user' }) end
-        return
-    end
-
-    local character = user.getUsedCharacter
+    local character = GetHousingCharacter(src)
     if not character then
         if cbFn then cbFn(false, { error = 'no_character' }) end
         return
@@ -185,7 +179,7 @@ local function handleCreationDBInsert(src, tpHouse, owner, radius, doors, houseC
     local encodedPolyPoints = encodePolyPoints(polyPoints)
     if not tpHouse then
         param = {
-            ['charidentifier'] = owner,
+            ['characterId'] = owner,
             ['radius'] = numericRadius,
             ['doors'] = '[]', -- locks are created below, after the house exists
             ['houseCoords'] = json.encode(houseCoords),
@@ -202,7 +196,7 @@ local function handleCreationDBInsert(src, tpHouse, owner, radius, doors, houseC
         }
     else
         param = {
-            ['charidentifier'] = owner,
+            ['characterId'] = owner,
             ['radius'] = numericRadius,
             ['doors'] = 'none',
             ['houseCoords'] = json.encode(houseCoords),
@@ -219,11 +213,11 @@ local function handleCreationDBInsert(src, tpHouse, owner, radius, doors, houseC
         }
     end
 
-    local result = DB.query('SELECT * FROM bcchousing WHERE charidentifier=?', param.charidentifier)
+    local result = DB.query('SELECT * FROM bcchousing WHERE character_id=?', param.characterId)
     if #result < Config.Setup.MaxHousePerChar then
         local houseId = DB.insert(
-            'INSERT INTO bcchousing ( `charidentifier`,`house_radius_limit`,`doors`,`house_coords`,`invlimit`,`tax_amount`,`tpInt`,`tpInstance`, `uniqueName`, `ownershipStatus`, `purchaseCurrencyType`, `poly_points`, `poly_min_z`, `poly_max_z`, `purchased_at`) VALUES ( ?,?,?,?,?,?,?,?, ?, ?, ?, ?, ?, ?, NOW() )',
-            param.charidentifier, param.radius, param.doors, param.houseCoords, param.invlimit, param.taxes,
+            'INSERT INTO bcchousing ( `character_id`,`house_radius_limit`,`doors`,`house_coords`,`invlimit`,`tax_amount`,`tpInt`,`tpInstance`, `uniqueName`, `ownershipStatus`, `purchaseCurrencyType`, `poly_points`, `poly_min_z`, `poly_max_z`, `purchased_at`) VALUES ( ?,?,?,?,?,?,?,?, ?, ?, ?, ?, ?, ?, NOW() )',
+            param.characterId, param.radius, param.doors, param.houseCoords, param.invlimit, param.taxes,
             param.tpInt, param.tpInstance, param.uniqueName, param.ownershipStatus, param.purchaseCurrencyType,
             param.polyPoints, param.polyMinZ, param.polyMaxZ
         )
@@ -233,7 +227,7 @@ local function handleCreationDBInsert(src, tpHouse, owner, radius, doors, houseC
         local propertyKey = houseId and HousingProperty.CustomKey(houseId)
         local registeredProperty = propertyKey and HousingProperty.EnsureCustom(houseId,
             ('House %s'):format(tostring(houseId))) or Housing.Err('insert_failed', 'House row was not created.')
-        local assigned = registeredProperty.ok and HousingProperty.Assign(propertyKey, param.charidentifier,
+        local assigned = registeredProperty.ok and HousingProperty.Assign(propertyKey, param.characterId,
             param.ownershipStatus == 'rented' and 'tenant' or 'owner',
             HousingProperty.RequestId('create', houseId), src, 'housing.created') or registeredProperty
         if not assigned.ok then
@@ -256,7 +250,7 @@ local function handleCreationDBInsert(src, tpHouse, owner, radius, doors, houseC
         end
 
         Discord:sendMessage(_U('houseCreatedWebhook') ..
-            tostring(character.charIdentifier) .. _U('houseCreatedWebhookGivenToo') .. tostring(owner))
+            tostring(character.characterId) .. _U('houseCreatedWebhookGivenToo') .. tostring(owner))
 
         Wait(1500)
 
@@ -364,22 +358,15 @@ end)
 
 
 local function refreshPlayerHouses(targetSource)
-    local user = HousingUser(targetSource)
-    if not user then
-        DBG:Info("refreshPlayerHouses: no user for source " .. tostring(targetSource))
-        return nil
-    end
-
-    local character = user.getUsedCharacter
-    if not character or not character.charIdentifier then
+    local character = GetHousingCharacter(targetSource)
+    if not character or not character.characterId then
         DBG:Info("refreshPlayerHouses: missing character for source " .. tostring(targetSource))
         return nil
     end
 
-    local charIdentifierString = tostring(character.charIdentifier)
-    local charIdentifierNumber = tonumber(character.charIdentifier)
+    local characterIdString = tostring(character.characterId)
 
-    DBG:Info("Checking if player owns or has access to a house for character ID: " .. charIdentifierString)
+    DBG:Info("Checking if player owns or has access to a house for character ID: " .. characterIdString)
 
     local result = DB.query("SELECT * FROM bcchousing")
     local accessibleHouses = {}
@@ -388,15 +375,14 @@ local function refreshPlayerHouses(targetSource)
         for _, v in ipairs(result) do
             v.purchased_at_formatted = formatPurchasedAt(v.purchased_at)
             local decodedCoords = json.decode(v.house_coords)
-            local ownerIdString = tostring(v.charidentifier)
-            local ownerIdNumber = tonumber(v.charidentifier)
-            local hasAccessToProperty = (charIdentifierNumber and ownerIdNumber and charIdentifierNumber == ownerIdNumber) or ownerIdString == charIdentifierString
+            local ownerIdString = tostring(v.character_id)
+            local hasAccessToProperty = ownerIdString == characterIdString
 
             if not hasAccessToProperty then
                 local allowedIdsTable = (v.allowed_ids ~= nil and v.allowed_ids ~= 'none') and json.decode(v.allowed_ids) or nil
                 if allowedIdsTable then
                     for _, allowedId in ipairs(allowedIdsTable) do
-                        if tostring(allowedId) == charIdentifierString then
+                        if tostring(allowedId) == characterIdString then
                             hasAccessToProperty = true
                             break
                         end
@@ -418,12 +404,12 @@ local function refreshPlayerHouses(targetSource)
             local finalLimit = select(1, calculateFinalInventoryLimit(v.invlimit, v.ownershipStatus, currentStage))
             ensureHouseInventoryRegistered(v.houseid, v, finalLimit)
 
-            if (charIdentifierNumber and ownerIdNumber and charIdentifierNumber == ownerIdNumber) or ownerIdString == charIdentifierString then
+            if ownerIdString == characterIdString then
                 table.insert(accessibleHouses, v.houseid)
                 
                 -- ✅ Notify player they own this house and show the ID
                 HousingRPC:Notify('bcc-housing:OwnsHouseClientHandler', { house = v, isOwner = true }, targetSource)
-                DBG:Info("Player " .. charIdentifierString .. " owns house ID: " .. tostring(v.houseid))
+                DBG:Info("Player " .. characterIdString .. " owns house ID: " .. tostring(v.houseid))
             else
                 if hasAccessToProperty then
                     table.insert(accessibleHouses, v.houseid)
@@ -469,20 +455,14 @@ HousingRPC:Register('bcc-house:OpenHouseInv', function(params, cb, src)
         return
     end
 
-    local user = HousingUser(src)
-    if not user then
-        if cb then cb(false, { error = _U('noHouseFound') }) end
-        return
-    end
-
-    local character = user.getUsedCharacter
+    local character = GetHousingCharacter(src)
     if not character then
         if cb then cb(false, { error = _U('noHouseFound') }) end
         return
     end
 
-    local charIdentifier = character.charIdentifier
-    DBG:Info("Opening house inventory for House ID: " .. tostring(houseId) .. " and character ID: " .. tostring(charIdentifier))
+    local characterId = character.characterId
+    DBG:Info("Opening house inventory for House ID: " .. tostring(houseId) .. " and character ID: " .. tostring(characterId))
 
     local result = DB.query("SELECT * FROM bcchousing WHERE houseid = ?", houseId)
     if not result or #result == 0 then
@@ -519,7 +499,7 @@ HousingRPC:Register('bcc-house:OpenHouseInv', function(params, cb, src)
 
     local allowedIds = json.decode(houseData.allowed_ids) or {}
     for _, id in ipairs(allowedIds) do
-        if tostring(id) == tostring(charIdentifier) then
+        if tostring(id) == tostring(characterId) then
             DBG:Info("Player is allowed to access house ID: " .. tostring(houseId))
             openInventory()
             return
@@ -563,15 +543,14 @@ HousingRPC:Register('bcc-housing:GetInventoryStages', function(params, cb, src)
         return
     end
 
-    local result = DB.query("SELECT invlimit, ownershipStatus, taxes_collected, charidentifier, inventory_current_stage FROM bcchousing WHERE houseid = ?", houseId)
+    local result = DB.query("SELECT invlimit, ownershipStatus, taxes_collected, character_id, inventory_current_stage FROM bcchousing WHERE houseid = ?", houseId)
     if not result or #result == 0 then
         if cb then cb(false, { error = _U('noHouseFound') }) end
         return
     end
 
-    local user = HousingUser(src)
-    local character = user and user.getUsedCharacter
-    local charIdentifier = character and character.charIdentifier
+    local character = GetHousingCharacter(src)
+    local characterId = character and character.characterId
 
     local row = result[1]
     local taxStatus = tostring(row.taxes_collected)
@@ -591,7 +570,7 @@ HousingRPC:Register('bcc-housing:GetInventoryStages', function(params, cb, src)
             finalLimit = finalLimit,
             baseLimit = baseLimit,
             bonus = bonus,
-            isOwner = charIdentifier and tostring(row.charidentifier) == tostring(charIdentifier) or false
+            isOwner = characterId and tostring(row.character_id) == tostring(characterId) or false
         })
     end
 end)
@@ -603,19 +582,13 @@ HousingRPC:Register('bcc-housing:UpgradeInventory', function(params, cb, src)
         return
     end
 
-    local user = HousingUser(src)
-    if not user then
-        if cb then cb(false, { error = 'no_user' }) end
-        return
-    end
-
-    local character = user.getUsedCharacter
+    local character = GetHousingCharacter(src)
     if not character then
         if cb then cb(false, { error = 'no_character' }) end
         return
     end
 
-    local result = DB.query("SELECT invlimit, ownershipStatus, charidentifier, inventory_current_stage FROM bcchousing WHERE houseid = ?", houseId)
+    local result = DB.query("SELECT invlimit, ownershipStatus, character_id, inventory_current_stage FROM bcchousing WHERE houseid = ?", houseId)
     if not result or #result == 0 then
         if cb then cb(false, { error = _U('noHouseFound') }) end
         return
@@ -636,7 +609,7 @@ HousingRPC:Register('bcc-housing:UpgradeInventory', function(params, cb, src)
     end
 
     local stageCost = tonumber(nextStage.cost) or 0
-    if stageCost > 0 and not HousingEconomy.HasFunds(character.charIdentifier, 'dollars', stageCost) then
+    if stageCost > 0 and not HousingEconomy.HasFunds(character.characterId, 'dollars', stageCost) then
         if cb then cb(false, { error = 'notEnoughCash' }) end
         return
     end
@@ -777,10 +750,10 @@ end
 -- Character UUIDs that may open the doors of a house: its holder and roommates.
 function HouseDoorAccessIds(houseRow)
     local ids = {}
-    if type(houseRow.charidentifier) == 'string' then ids[#ids + 1] = houseRow.charidentifier end
+    if type(houseRow.character_id) == 'string' then ids[#ids + 1] = houseRow.character_id end
     local ok, roommates = pcall(json.decode, houseRow.allowed_ids or '[]')
     for _, id in ipairs(ok and type(roommates) == 'table' and roommates or {}) do
-        if tostring(id) ~= houseRow.charidentifier then ids[#ids + 1] = tostring(id) end
+        if tostring(id) ~= houseRow.character_id then ids[#ids + 1] = tostring(id) end
     end
     return ids
 end
@@ -788,7 +761,7 @@ end
 -- Re-applies the holder and roommates to every lock of a house (after a sale
 -- or a roommate change).
 function SyncHouseDoors(houseId)
-    local row = DB.one('SELECT houseid, charidentifier, allowed_ids, doors FROM bcchousing WHERE houseid = ?', houseId)
+    local row = DB.one('SELECT houseid, character_id, allowed_ids, doors FROM bcchousing WHERE houseid = ?', houseId)
     if not row then return end
     local ok, doorIds = pcall(json.decode, row.doors or '[]')
     for _, doorId in ipairs(ok and type(doorIds) == 'table' and doorIds or {}) do
@@ -809,7 +782,7 @@ end
 
 -- Creates locks for picked doors and appends their IDs to the house row.
 function CreateHouseDoorLocks(houseId, doorTables)
-    local row = DB.one('SELECT houseid, charidentifier, allowed_ids, doors FROM bcchousing WHERE houseid = ?', houseId)
+    local row = DB.one('SELECT houseid, character_id, allowed_ids, doors FROM bcchousing WHERE houseid = ?', houseId)
     if not row then return 0 end
     local ok, current = pcall(json.decode, row.doors or '[]')
     current = ok and type(current) == 'table' and current or {}
@@ -977,20 +950,14 @@ HousingRPC:Register('bcc-housing:getHouseId', function(params, cb, src)
         return
     end
 
-    local user = HousingUser(src)
-    if not user then
-        if cb then cb(false, { error = _U('noHouseFound') }) end
-        return
-    end
-
-    local character = user.getUsedCharacter
+    local character = GetHousingCharacter(src)
     if not character then
         if cb then cb(false, { error = _U('noHouseFound') }) end
         return
     end
 
-    local charIdentifier = character.charIdentifier
-    DBG:Info(("getHouseId RPC invoked with charidentifier %s for House ID %s"):format(tostring(charIdentifier), tostring(houseId)))
+    local characterId = character.characterId
+    DBG:Info(("getHouseId RPC invoked by character %s for House ID %s"):format(tostring(characterId), tostring(houseId)))
 
     local result = DB.query("SELECT * FROM bcchousing WHERE houseid = ?", houseId)
     if not result or #result == 0 then
@@ -1000,22 +967,22 @@ HousingRPC:Register('bcc-housing:getHouseId', function(params, cb, src)
     end
 
     local houseData = result[1]
-    local ownerCharId = tostring(houseData.charidentifier)
-    local isOwner = ownerCharId == tostring(charIdentifier)
+    local ownerCharId = tostring(houseData.character_id)
+    local isOwner = ownerCharId == tostring(characterId)
     local hasAccess = isOwner
 
     if context == 'access' or context == 'removeAccess' then
-        DBG:Info(("[ACCESS CMD] charidentifier %s targeting house %s | owner charidentifier %s | isOwner: %s"):format(
-            tostring(charIdentifier), tostring(houseId), ownerCharId, tostring(isOwner)))
+        DBG:Info(("[ACCESS CMD] character %s targeting house %s | owner %s | isOwner: %s"):format(
+            tostring(characterId), tostring(houseId), ownerCharId, tostring(isOwner)))
     else
-        DBG:Info(("[HOUSE CMD] context %s | charidentifier %s | house %s | owner charidentifier %s | isOwner: %s"):format(
-            tostring(context), tostring(charIdentifier), tostring(houseId), ownerCharId, tostring(isOwner)))
+        DBG:Info(("[HOUSE CMD] context %s | character %s | house %s | owner %s | isOwner: %s"):format(
+            tostring(context), tostring(characterId), tostring(houseId), ownerCharId, tostring(isOwner)))
     end
 
     if not hasAccess then
         local allowedIds = json.decode(houseData.allowed_ids) or {}
         for _, id in ipairs(allowedIds) do
-            if tostring(id) == tostring(charIdentifier) then
+            if tostring(id) == tostring(characterId) then
                 hasAccess = true
                 break
             end
@@ -1052,20 +1019,14 @@ HousingRPC:Register('bcc-housing:getHouseOwner', function(params, cb, src)
         return
     end
 
-    local user = HousingUser(src)
-    if not user then
-        if cb then cb(false, { error = _U('noHouseFound') }) end
-        return
-    end
-
-    local character = user.getUsedCharacter
+    local character = GetHousingCharacter(src)
     if not character then
         if cb then cb(false, { error = _U('noHouseFound') }) end
         return
     end
 
-    local charIdentifier = character.charIdentifier
-    DBG:Info(("getHouseOwner RPC invoked with charidentifier %s for House ID %s"):format(tostring(charIdentifier), tostring(houseId)))
+    local characterId = character.characterId
+    DBG:Info(("getHouseOwner RPC invoked by character %s for House ID %s"):format(tostring(characterId), tostring(houseId)))
 
     local result = DB.query("SELECT * FROM bcchousing WHERE houseid = ?", houseId)
     if not result or #result == 0 then
@@ -1075,7 +1036,7 @@ HousingRPC:Register('bcc-housing:getHouseOwner', function(params, cb, src)
     end
 
     local houseData = result[1]
-    local isOwner = tostring(houseData.charidentifier) == tostring(charIdentifier)
+    local isOwner = tostring(houseData.character_id) == tostring(characterId)
     local taxStatus = tostring(houseData.taxes_collected)
     local taxesOverdue = taxStatus == 'overdue'
     local taxPaymentReleased = taxStatus == 'released'
@@ -1098,21 +1059,15 @@ HousingRPC:Register('bcc-housing:GetHouseContext', function(params, cb, src)
         return
     end
 
-    local user = HousingUser(src)
-    if not user then
-        if cb then cb(false, { error = _U('noHouseFound') }) end
-        return
-    end
-
-    local character = user.getUsedCharacter
+    local character = GetHousingCharacter(src)
     if not character then
         if cb then cb(false, { error = _U('noHouseFound') }) end
         return
     end
 
-    local charIdentifier = tostring(character.charIdentifier)
+    local characterId = tostring(character.characterId)
     local result = DB.query(
-        "SELECT house_coords, house_radius_limit, tpInt, tpInstance, ownershipStatus, taxes_collected, purchased_at, charidentifier, allowed_ids, poly_points, poly_min_z, poly_max_z FROM bcchousing WHERE houseid = ?",
+        "SELECT house_coords, house_radius_limit, tpInt, tpInstance, ownershipStatus, taxes_collected, purchased_at, character_id, allowed_ids, poly_points, poly_min_z, poly_max_z FROM bcchousing WHERE houseid = ?",
         houseId)
 
     if not result or #result == 0 then
@@ -1127,8 +1082,8 @@ HousingRPC:Register('bcc-housing:GetHouseContext', function(params, cb, src)
         return
     end
 
-    local ownerIdentifier = tostring(row.charidentifier or '')
-    local hasAccess = ownerIdentifier == charIdentifier
+    local ownerIdentifier = tostring(row.character_id or '')
+    local hasAccess = ownerIdentifier == characterId
 
     if not hasAccess then
         local allowedIds = {}
@@ -1140,7 +1095,7 @@ HousingRPC:Register('bcc-housing:GetHouseContext', function(params, cb, src)
         end
 
         for _, allowed in ipairs(allowedIds) do
-            if tostring(allowed) == charIdentifier then
+            if tostring(allowed) == characterId then
                 hasAccess = true
                 break
             end

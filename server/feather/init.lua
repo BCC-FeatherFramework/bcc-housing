@@ -1,10 +1,11 @@
 -- bcc-housing's boundary to the Feather Framework (server side).
 --
 -- Keeps the call shapes the existing services were written against (an RPC
--- object with Register/Notify/Call/CallAsync, character objects with
--- charIdentifier/firstname/lastname, Discord:sendMessage) while every value now
--- comes from feather-core sessions and the Character provider. Character IDs are
--- UUIDs; nothing the client sends is trusted for identity.
+-- object with Register/Notify/Call/CallAsync, Discord:sendMessage) while every
+-- value comes from feather-core sessions and the Character provider. A character
+-- is { source, characterId, accountId, firstname, lastname }; characterId is the
+-- Feather character UUID (character_id in this resource's tables). Nothing the
+-- client sends is trusted for identity.
 
 -- RPC --------------------------------------------------------------------------
 -- Handler shape as before: function(params, cb, source). cb(...) may return
@@ -94,8 +95,7 @@ function HousingCharacters.Get(src)
     local firstname, lastname = HousingCharacters.GetName(characterId)
     return {
         source = src,
-        charIdentifier = characterId,
-        identifier = characterId,
+        characterId = characterId,
         accountId = session.value.accountId,
         firstname = firstname,
         lastname = lastname
@@ -106,17 +106,9 @@ end
 function HousingCharacters.FindSource(characterId)
     for _, playerId in ipairs(GetPlayers()) do
         local character = HousingCharacters.Get(playerId)
-        if character and character.charIdentifier == characterId then return tonumber(playerId) end
+        if character and character.characterId == characterId then return tonumber(playerId) end
     end
     return nil
-end
-
--- Same shape as HousingUser(src): nil without an active character, else a
--- table whose getUsedCharacter is the character above. Keeps the existing
--- `user.getUsedCharacter` call sites unchanged.
-function HousingUser(src)
-    local character = HousingCharacters.Get(src)
-    return character and { getUsedCharacter = character } or nil
 end
 
 AddEventHandler('onResourceStart', function(resource)

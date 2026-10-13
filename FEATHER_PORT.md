@@ -25,6 +25,7 @@ domains that own them; bcc-housing keeps no money and no ownership truth.
 ## Rules (from the master plan)
 
 - No `vorp_*`, `bcc-utils`, `oxmysql`, `feather-menu` (v1), `feather-roles`.
+- No VORP naming: `characterId` / `character_id`, never `charIdentifier` / `charidentifier`.
 - bcc-housing never writes another resource's tables (doors go through the bcc-doorlocks API since H6).
 - No money held in bcc-housing tables (today: `ledger`, `bcchousing_transactions`).
 - `Config.DevMode = false` in the committed config.
@@ -36,9 +37,11 @@ domains that own them; bcc-housing keeps no money and no ownership truth.
   configured floor and ceiling), and PolyZone only draws outlines when it runs.
 - Translations are registered in feather-core as `bcc-housing.<key>` for `en_us`, `ro`,
   `pl`, `de`, `fr` and `uk`; each player sees their own language.
-- Character objects come from Core sessions (`HousingCharacters.Get`); `HousingUser(src)`
-  keeps the old `user.getUsedCharacter` call shape until the money phase rewrites the
-  call sites that read balances.
+- Character objects come from Core sessions (`GetHousingCharacter(src)`, a
+  `{ source, characterId, accountId, firstname, lastname }` table). Since 2026-10-13
+  the VORP names are gone: `characterId` in Lua, `character_id` (`CHAR(36)`) in every
+  bcc-housing table; older tables are renamed on start (`charidentifier`, and
+  `identifier` on the payout queue).
 
 ## Trust entries needed
 
@@ -48,7 +51,7 @@ domains that own them; bcc-housing keeps no money and no ownership truth.
 | feather-jobs `config.lua` | `trustedReaders` | H2 (added on the dev server) |
 | feather-property `config.lua`; feather-admin `configs/service_policy.lua` | `trustedReaders`, `trustedManagers`, `trustedAuditors`; `['feather-property']['bcc-housing']` `property.property.manage`, `property.interest.manage` | H3 (added on the dev server) |
 | feather-economy `config.lua`; feather-admin `configs/service_policy.lua` | `trustedReaders`, `trustedProvisioners`, `trustedTransactors`, `trustedSuppliers`; `['feather-economy']['bcc-housing']['economy.currency.issue']` (agent buy-back, furniture sell-back) | H4 (added on the dev server) |
-- **Holder cache:** `bcchousing.charidentifier` and `bcchousinghotels` only cache the
+- **Holder cache:** `bcchousing.character_id` and `bcchousinghotels` only cache the
   holder; feather-property is the truth. On start every configured house and hotel is
   registered and each house row is reconciled (a different holder fixes the cache; a row
   without a holder is reported, not deleted).

@@ -318,7 +318,7 @@ function GetPlayersWithAccess(houseId, callback)
         if result and #result > 0 then
             DBG:Info("Number of players with access received: " .. tostring(#result))
             for _, player in ipairs(result) do
-                DBG:Info("Player: ID=" .. player.charidentifier .. ", Name=" .. player.firstname .. " " .. player.lastname)
+                DBG:Info("Player: ID=" .. player.characterId .. ", Name=" .. player.firstname .. " " .. player.lastname)
             end
             callback(result) -- Pass the result to the callback
         else
