@@ -193,12 +193,7 @@ HousingRPC:Register('bcc-house:AdminReleaseHouseTaxPayment', function(params, cb
         return
     end
 
-    local affectedRows = DB.exec(
-        "UPDATE bcchousing SET taxes_collected = 'released' WHERE houseid = ? AND taxes_collected = 'overdue'",
-        houseId
-    )
-
-    if affectedRows and affectedRows > 0 then
+    if HousingTaxes.Release(houseId) then
         NotifyClient(src, _U('taxPaymentReleasedAdmin'), 5000, 'success')
         if cb then cb(true) end
         return

@@ -245,6 +245,14 @@ if Config.DevMode then
     end, true)
 end
 
+-- Staff release of an overdue house: the holder may now pay the arrears.
+function HousingTaxes.Release(houseId)
+    local affected = DB.exec(
+        "UPDATE bcchousing SET taxes_collected = 'released' WHERE houseid = ? AND taxes_collected = 'overdue'",
+        tonumber(houseId))
+    return affected ~= nil and affected > 0
+end
+
 -- Pay ahead / pay arrears --------------------------------------------------------
 
 local function maxMonths()
@@ -253,31 +261,35 @@ end
 
 -- months = how many months to pay ahead. A 'released' (overdue) house first pays
 -- one period of arrears, which reactivates it; months may be 0 then.
-HousingRPC:Register('bcc-housing:PayTaxes', function(params, cb, src)
-    local houseId = tonumber(params and params.houseid)
-    local months = math.floor(tonumber(params and params.months) or 0)
-    local character = GetHousingCharacter(src)
-    if not houseId or not character then return cb(false, { error = 'invalid_params' }) end
-    if not IsHouseOwner(src, houseId) then
+-- The payer must hold the house. src is
+-- the player's source when they are online (notifications, and the arrears are
+-- paid with them as the acting debtor); without it the payment still runs and
+-- bcc-housing collects the arrears itself. Returns ok, result.
+function HousingTaxes.Pay(character, houseId, months, src)
+    houseId = tonumber(houseId)
+    months = math.floor(tonumber(months) or 0)
+    if not houseId or not character then return false, { error = 'invalid_params' } end
+    local key = DB.one('SELECT houseid, uniqueName FROM bcchousing WHERE houseid = ?', houseId)
+    if not key or not HousingProperty.Holds(HousingProperty.KeyForRow(key), character.characterId) then
         NotifyClient(src, _U('noAccessToHouse'), 4000, 'error')
-        return cb(false)
+        return false
     end
     local row = DB.one("SELECT * FROM bcchousing WHERE houseid = ?", houseId)
-    if not row then return cb(false) end
+    if not row then return false end
     local status = tostring(row.taxes_collected)
     local taxAmount = tonumber(row.tax_amount) or 0
     local currency = HousingTaxes.Currency(row)
     if not currency or taxAmount <= 0 then
         NotifyClient(src, _U('currencyNotSupported'), 4000, 'error')
-        return cb(false)
+        return false
     end
     if status == 'overdue' then
         NotifyClient(src, _U('taxesOverdue'), 5000, 'error')
-        return cb(false, { error = 'overdue' })
+        return false, { error = 'overdue' }
     end
     if months < 0 or months > maxMonths() or (months == 0 and status ~= 'released') then
         NotifyClient(src, _U('taxesPrepayLimit', maxMonths()), 4000, 'error')
-        return cb(false, { error = 'invalid_months' })
+        return false, { error = 'invalid_months' }
     end
 
     local paymentId = Housing.NewId()
@@ -287,7 +299,7 @@ HousingRPC:Register('bcc-housing:PayTaxes', function(params, cb, src)
         local arrears = HousingContracts.PayArrears(src, row, HousingEconomy.ToMinor(taxAmount), currency, paymentId)
         if not arrears.ok then
             NotifyClient(src, _U(HousingEconomy.MessageKey(arrears, currency)), 4000, 'error')
-            return cb(false, { error = arrears.code })
+            return false, { error = arrears.code }
         end
         DB.exec("UPDATE bcchousing SET taxes_collected = 'true' WHERE houseid = ? AND taxes_collected = 'released'", houseId)
         local reactivated = HousingProperty.SetStatus(propertyKey(row), 'active',
@@ -302,7 +314,7 @@ HousingRPC:Register('bcc-housing:PayTaxes', function(params, cb, src)
         if not paid.ok then
             NotifyClient(src, _U(HousingEconomy.MessageKey(paid, currency)), 4000, 'error')
             result.error = paid.code
-            return cb(result.taxesPaid, result)
+            return result.taxesPaid, result
         end
         local base = parseMysqlDate(row.taxes_paid_until)
         local now = today()
@@ -313,7 +325,13 @@ HousingRPC:Register('bcc-housing:PayTaxes', function(params, cb, src)
         result.paidUntil = untilKey
         NotifyClient(src, _U('taxesPaidAhead', formatMoney(taxAmount * months), months, untilKey), 6000, 'success')
     end
-    cb(true, result)
+    return true, result
+end
+
+HousingRPC:Register('bcc-housing:PayTaxes', function(params, cb, src)
+    local character = GetHousingCharacter(src)
+    if not character then return cb(false, { error = 'invalid_params' }) end
+    cb(HousingTaxes.Pay(character, params and params.houseid, params and params.months, src))
 end)
 
 -- Shows the tax state: amount per month, paid-until date, status.
@@ -337,3 +355,117 @@ HousingRPC:Register('bcc-housing:CheckLedger', function(params, cb, src)
             status = tostring(row.taxes_collected), maxMonths = maxMonths() })
     end
 end)
+
+-- Console, DevMode only ------------------------------------------------------------
+-- The in-game tax steps with nobody online:
+--   HousingTaxRelease <houseid>                         staff release of an overdue house
+--   HousingTaxPayAs <characterUuid> <houseid> <months>  the holder pays (arrears first, then months ahead)
+--   HousingArrearsFlowTest <houseid> <YYYY-MM-DD> <otherCharacterUuid>
+--     Full overdue path. MOVES MONEY: the holder's money, all but 0.01 less than one
+--     period's tax, is parked with the other character so the charge on that date
+--     cannot be paid; the house must go overdue and be suspended, refuse payment,
+--     be released by staff; then the money is returned and the holder pays the
+--     arrears, which settles the same Contracts obligation and reactivates the
+--     house. The parked money is returned even when a step fails. Offline the
+--     arrears are collected by bcc-housing (no player session to act as debtor).
+if Config.DevMode then
+    local function Uuid(value)
+        return type(value) == 'string'
+            and value:match('^%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x$')
+            and value:lower() or nil
+    end
+
+    RegisterCommand('HousingTaxRelease', function(source, args)
+        if source ~= 0 then return end
+        print(('[bcc-housing] release house %s: %s'):format(tostring(args[1]),
+            HousingTaxes.Release(args[1]) and 'released' or 'not overdue'))
+    end, true)
+
+    RegisterCommand('HousingTaxPayAs', function(source, args)
+        if source ~= 0 then return end
+        local characterId = Uuid(args[1])
+        if not characterId or not tonumber(args[2]) then
+            return print('[bcc-housing] Usage: HousingTaxPayAs <characterUuid> <houseid> <months>')
+        end
+        local ok, result = HousingTaxes.Pay({ characterId = characterId }, args[2], args[3])
+        print(('[bcc-housing] pay house %s: ok=%s %s'):format(args[2], tostring(ok), json.encode(result or {})))
+    end, true)
+
+    RegisterCommand('HousingArrearsFlowTest', function(source, args)
+        if source ~= 0 then return end
+        local houseId, date, otherId = tonumber(args[1]), parseMysqlDate(args[2]), Uuid(args[3])
+        local row = houseId and DB.one('SELECT * FROM bcchousing WHERE houseid = ?', houseId)
+        if not row or not date or not otherId or not Uuid(row.character_id) or row.character_id:lower() == otherId then
+            return print('[bcc-housing] Usage: HousingArrearsFlowTest <houseid> <YYYY-MM-DD> <otherCharacterUuid>'
+                .. ' (the house needs a holder; the other character must differ)')
+        end
+        local passed, total = 0, 0
+        local function Check(name, condition)
+            total = total + 1
+            if condition then passed = passed + 1 end
+            print(('[HousingArrearsFlowTest] %-34s %s'):format(name, condition and 'PASS' or 'FAIL'))
+        end
+        local holder = { characterId = row.character_id:lower() }
+        local currency = HousingTaxes.Currency(row)
+        local taxMinor = HousingEconomy.ToMinor(row.tax_amount)
+        local key = propertyKey(row)
+        local function House() return DB.one('SELECT * FROM bcchousing WHERE houseid = ?', houseId) end
+        local function PropertyStatus()
+            local snapshot = HousingProperty.Get(key)
+            return snapshot.ok and snapshot.value.status or nil
+        end
+        if not currency or taxMinor <= 0 or tostring(row.taxes_collected) == 'overdue'
+            or tostring(row.taxes_collected) == 'released' then
+            return print('[HousingArrearsFlowTest] the house needs a tax amount, a currency and no open arrears')
+        end
+
+        local balance = HousingEconomy.Balance(holder.characterId, currency)
+        local parkMinor = balance and (HousingEconomy.ToMinor(balance) - taxMinor + 1) or 0
+        local parked = false
+        local runId = Housing.NewId()
+        local called, problem = xpcall(function()
+            if parkMinor > 0 then
+                local park = HousingEconomy.PayTo(holder, otherId, currency, HousingEconomy.ToMajor(parkMinor),
+                    'housing.test_park', { type = 'housing_house', id = houseId }, 'housing:test-park:' .. runId)
+                parked = park.ok
+                Check('holder money parked', park.ok)
+                if not park.ok then return end
+            end
+
+            HousingTaxes.Collect(date, houseId)
+            local overdue = House()
+            local obligation = overdue.tax_obligation_id and HousingContracts.Get(overdue.tax_obligation_id)
+            Check('charge leaves house overdue', overdue.taxes_collected == 'overdue')
+            Check('property suspended', PropertyStatus() == 'suspended')
+            Check('obligation stays open', obligation and obligation.ok
+                and (obligation.value.status == 'issued' or obligation.value.status == 'due'))
+            local refused, refusal = HousingTaxes.Pay(holder, houseId, 0)
+            Check('payment refused while overdue', not refused and refusal and refusal.error == 'overdue')
+
+            Check('staff release', HousingTaxes.Release(houseId) and House().taxes_collected == 'released')
+
+            if parked then
+                local back = HousingEconomy.PayTo({ characterId = otherId }, holder.characterId, currency,
+                    HousingEconomy.ToMajor(parkMinor), 'housing.test_park', { type = 'housing_house', id = houseId },
+                    'housing:test-return:' .. runId)
+                parked = not back.ok
+                Check('holder money returned', back.ok)
+            end
+
+            local paid = HousingTaxes.Pay(holder, houseId, 0)
+            local after = House()
+            local settled = HousingContracts.Get(overdue.tax_obligation_id)
+            Check('arrears paid', paid and after.taxes_collected == 'true')
+            Check('property active again', PropertyStatus() == 'active')
+            Check('same obligation settled', settled.ok and settled.value.status == 'settled')
+        end, debug.traceback)
+        if parked then
+            local back = HousingEconomy.PayTo({ characterId = otherId }, holder.characterId, currency,
+                HousingEconomy.ToMajor(parkMinor), 'housing.test_park', { type = 'housing_house', id = houseId },
+                'housing:test-return:' .. runId)
+            print(('[HousingArrearsFlowTest] parked money returned after a failure: %s'):format(tostring(back.ok)))
+        end
+        if not called then print('[HousingArrearsFlowTest] FAIL ' .. tostring(problem)) end
+        print(('[HousingArrearsFlowTest] done %d/%d passed (MUTATING: house %s, run %s)'):format(passed, total, houseId, runId))
+    end, true)
+end

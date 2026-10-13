@@ -127,6 +127,10 @@ function HousingContracts.PayArrears(src, row, amountMinor, currency, paymentId)
     }, { actorSource = src }))
 end
 
+function HousingContracts.Get(obligationId)
+    return call('GetObligation', { obligationId = obligationId })
+end
+
 -- Cancels the house's open obligation. With keepFor, an obligation whose debtor
 -- is that character is kept (it is the current holder's debt).
 function HousingContracts.CancelOpen(row, reasonCode, keepFor)
