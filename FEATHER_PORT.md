@@ -72,6 +72,14 @@ domains that own them; bcc-housing keeps no money and no ownership truth.
 
 ## Live acceptance (to run)
 
+Offline first (DevMode, nobody online): `HousingPropertyFlowTest <characterUuid> <otherCharacterUuid>`
+runs steps 2, 6 and 7 on feather-property through the same flows as the menus
+(`HousingFlows` in `buyHouse.lua`, `sellHouse.lua`, `hotels.lua`): rent, a non-tenant cannot
+end the rental, unrent, buy (deed stored), sale with inventory to the second character, the
+former owner cannot sell, sale to the agent (payout paid), hotel room (not twice; ended again
+as cleanup). Both characters must hold no house. In game, the offer on the buyer's screen,
+menus, blips and door prompts still need a player.
+
 1. `HousingReleaseSmokeTest`: every line PASS.
 2. Buy a configured house; a second player cannot buy it. Rent another; unrent it.
 3. Pay taxes ahead. With `Config.DevMode = true`, `HousingTaxCollectAt <YYYY-MM-DD> <houseid>`

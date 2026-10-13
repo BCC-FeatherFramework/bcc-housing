@@ -1,3 +1,12 @@
+-- Flows shared by the RPC handlers and the console tests. A handler given a
+-- character (an offline one in the tests) skips everything a player needs to be
+-- online for; client events are only sent when there is a player source.
+HousingFlows = HousingFlows or {}
+
+local function NotifyPlayer(name, params, src)
+    if src then HousingRPC:Notify(name, params, src) end
+end
+
 -- Event to handle the purchasing of a house
 local pendingHousePurchases = {}
 
@@ -42,14 +51,14 @@ local function encodePolyPoints(points)
     return json.encode(normalized)
 end
 
-local function handleHousePurchase(src, houseCoords, moneyTypeParam, cb)
+local function handleHousePurchase(src, houseCoords, moneyTypeParam, cb, offlineCharacter)
     local cbFn = type(cb) == 'function' and cb or nil
     if not houseCoords then
         if cbFn then cbFn(false, { error = 'invalid_coords' }) end
         return
     end
 
-    local character = GetHousingCharacter(src)
+    local character = offlineCharacter or GetHousingCharacter(src)
     if not character then
         if cbFn then cbFn(false, { error = 'no_character' }) end
         return
@@ -187,8 +196,8 @@ local function handleHousePurchase(src, houseCoords, moneyTypeParam, cb)
     insertHouseDoors(selectedHouse.doors, character.characterId, houseId, selectedHouse.uniqueName)
     GiveHousePropertyDocument(src, character, selectedHouse, houseId, ownershipStatus)
 
-    HousingRPC:Notify('bcc-housing:clearBlips', { houseId = selectedHouse.houseId }, src)
-    HousingRPC:Notify('bcc-housing:housePurchased', { houseCoords = coordsToPayload(selectedHouse.houseCoords) }, src)
+    NotifyPlayer('bcc-housing:clearBlips', { houseId = selectedHouse.houseId }, src)
+    NotifyPlayer('bcc-housing:housePurchased', { houseCoords = coordsToPayload(selectedHouse.houseCoords) }, src)
 
     local displayAmount
     if currency == 'dollars' then
@@ -207,7 +216,7 @@ local function handleHousePurchase(src, houseCoords, moneyTypeParam, cb)
         '\nHouse: ' .. selectedHouse.name .. ' was **' .. ownershipStatus .. '** for ' .. displayAmount ..
         '\nCharacter Name: ' .. tostring(character.firstname) .. ' ' .. tostring(character.lastname))
 
-    HousingRPC:Notify('bcc-housing:ClientRecHouseLoad', {}, src)
+    NotifyPlayer('bcc-housing:ClientRecHouseLoad', {}, src)
 
     if cbFn then cbFn(true, { uniqueName = selectedHouse.uniqueName, ownershipStatus = ownershipStatus }) end
 end
@@ -215,6 +224,13 @@ end
 HousingRPC:Register('bcc-housing:buyHouse', function(params, cb, src)
     handleHousePurchase(src, params and params.houseCoords, params and params.moneyType, cb)
 end)
+
+-- Buys (moneyType 0) or rents (moneyType 1) the configured house at houseCoords.
+function HousingFlows.Purchase(character, houseCoords, moneyType)
+    local result = { ok = false }
+    handleHousePurchase(nil, houseCoords, moneyType, function(ok, value) result = { ok = ok, value = value } end, character)
+    return result
+end
 
 
 -- Locks the configured doors of a house for its new holder through the

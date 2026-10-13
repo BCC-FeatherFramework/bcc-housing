@@ -58,10 +58,12 @@ HousingRPC:Register('bcc-housing:HotelDbRegistry', function(params, cb, src)
     if cb then cb(true, ownedHotelsTable) end
 end)
 
-HousingRPC:Register('bcc-housing:HotelBought', function(params, cb, src)
+-- Buys a room: a tenant interest on the hotel's property, then the payment.
+-- offlineCharacter is used by the console tests (no player needed).
+local function handleHotelBought(params, cb, src, offlineCharacter)
     local requestedHotel = params and params.hotel
     local hotelTable = findHotelConfig(requestedHotel and requestedHotel.hotelId)
-    local character = GetHousingCharacter(src)
+    local character = offlineCharacter or GetHousingCharacter(src)
     if not character or not character.characterId then
         if cb then cb(false) end
         return
@@ -115,7 +117,20 @@ HousingRPC:Register('bcc-housing:HotelBought', function(params, cb, src)
         charId, json.encode(ownedHotelsTable))
 
     if cb then cb(true, ownedHotelsTable) end
+end
+
+HousingRPC:Register('bcc-housing:HotelBought', function(params, cb, src)
+    handleHotelBought(params, cb, src)
 end)
+
+HousingFlows = HousingFlows or {}
+
+function HousingFlows.BuyHotelRoom(character, hotelId)
+    local result = { ok = false }
+    handleHotelBought({ hotel = { hotelId = hotelId } },
+        function(ok, value) result = { ok = ok, value = value } end, nil, character)
+    return result
+end
 
 HousingRPC:Register('bcc-housing:RegisterHotelInventory', function(params, cb, src)
     local hotelId = params and params.hotelId

@@ -1,3 +1,10 @@
+-- Flows shared by the RPC handlers and the console tests (see buyHouse.lua).
+HousingFlows = HousingFlows or {}
+
+local function NotifyPlayer(name, params, src)
+    if src then HousingRPC:Notify(name, params, src) end
+end
+
 -- Payouts owed by the housing agent (sale back to the agent). The money is
 -- created in the seller's wallet through Economy (policy-gated Issue). Each payout
 -- is recorded with its idempotency key before it is attempted, so a payout that
@@ -52,7 +59,7 @@ local function findHouseConfigByUniqueName(uniqueName)
     return nil
 end
 
-local function handleSellHouse(src, houseIdParam, cb)
+local function handleSellHouse(src, houseIdParam, cb, offlineCharacter)
     local cbFn = type(cb) == 'function' and cb or nil
     local houseId = tonumber(houseIdParam)
     if not houseId then
@@ -61,7 +68,7 @@ local function handleSellHouse(src, houseIdParam, cb)
         return
     end
 
-    local character = GetHousingCharacter(src)
+    local character = offlineCharacter or GetHousingCharacter(src)
     if not character then
         DBG:Info('handleSellHouse: no character for source ' .. tostring(src))
         if cbFn then cbFn(false, { error = 'no_character' }) end
@@ -158,10 +165,10 @@ local function handleSellHouse(src, houseIdParam, cb)
         NotifyClient(src, _U('houseSoldSuccess', sellPrice), 4000, 'success')
         Discord:sendMessage('House sold by characterId: ' .. tostring(characterId) .. '\nHouse ID: ' .. tostring(houseId) .. ' was sold for $' .. tostring(sellPrice))
 
-        HousingRPC:Notify('bcc-housing:OwnsHouseClientHandler', { house = houseData, isOwner = false}, src)
-        HousingRPC:Notify('bcc-housing:StopPropertyCheck', {}, src)
-        HousingRPC:Notify('bcc-housing:clearBlips', { houseId = houseId }, src)
-        HousingRPC:Notify('bcc-housing:ReinitializeChecksAfterSale', {}, src)
+        NotifyPlayer('bcc-housing:OwnsHouseClientHandler', { house = houseData, isOwner = false}, src)
+        NotifyPlayer('bcc-housing:StopPropertyCheck', {}, src)
+        NotifyPlayer('bcc-housing:clearBlips', { houseId = houseId }, src)
+        NotifyPlayer('bcc-housing:ReinitializeChecksAfterSale', {}, src)
 
         if cbFn then cbFn(true, { amount = sellPrice }) end
 end
@@ -170,7 +177,7 @@ HousingRPC:Register('bcc-housing:sellHouse', function(params, cb, src)
     handleSellHouse(src, params and params.houseId, cb)
 end)
 
-local function handleUnrentHouse(src, houseIdParam, cb)
+local function handleUnrentHouse(src, houseIdParam, cb, offlineCharacter)
     local cbFn = type(cb) == 'function' and cb or nil
     local houseId = tonumber(houseIdParam)
     if not houseId then
@@ -178,7 +185,7 @@ local function handleUnrentHouse(src, houseIdParam, cb)
         return
     end
 
-    local character = GetHousingCharacter(src)
+    local character = offlineCharacter or GetHousingCharacter(src)
     if not character then
         if cbFn then cbFn(false, { error = 'no_character' }) end
         return
@@ -235,10 +242,10 @@ local function handleUnrentHouse(src, houseIdParam, cb)
         NotifyClient(src, _U('rentalEndedSuccess'), 4000, 'success')
         Discord:sendMessage('House rental ended by characterId: ' .. tostring(characterId) .. '\nHouse ID: ' .. tostring(houseId))
 
-        HousingRPC:Notify('bcc-housing:StopPropertyCheck', {}, src)
-        HousingRPC:Notify('bcc-housing:clearBlips', { houseId = houseId }, src)
-        HousingRPC:Notify('bcc-housing:ReinitializeChecksAfterSale', {}, src)
-        HousingRPC:Notify('bcc-housing:ClientRecHouseLoad', {}, src)
+        NotifyPlayer('bcc-housing:StopPropertyCheck', {}, src)
+        NotifyPlayer('bcc-housing:clearBlips', { houseId = houseId }, src)
+        NotifyPlayer('bcc-housing:ReinitializeChecksAfterSale', {}, src)
+        NotifyPlayer('bcc-housing:ClientRecHouseLoad', {}, src)
 
         if cbFn then cbFn(true, { houseId = houseId }) end
 end
@@ -246,6 +253,18 @@ end
 HousingRPC:Register('bcc-housing:unrentHouse', function(params, cb, src)
     handleUnrentHouse(src, params and params.houseId, cb)
 end)
+
+local function Collect(handler, houseId, character)
+    local result = { ok = false }
+    handler(nil, houseId, function(ok, value) result = { ok = ok, value = value } end, character)
+    return result
+end
+
+-- The owner sells the house back to the agent (payout through Economy).
+function HousingFlows.SellToAgent(character, houseId) return Collect(handleSellHouse, houseId, character) end
+
+-- The tenant ends the rental.
+function HousingFlows.Unrent(character, houseId) return Collect(handleUnrentHouse, houseId, character) end
 
 
 -- Sale to another player -------------------------------------------------------
@@ -259,6 +278,21 @@ local pendingOffers = {} -- offerId -> offer
 
 local function houseName(houseConfig, houseId)
     return (houseConfig and (houseConfig.name or houseConfig.uniqueName)) or ('#' .. tostring(houseId))
+end
+
+-- The house's config when the seller owns it and it may be sold to a player,
+-- else nil and a message key.
+local function sellableBy(seller, houseId)
+    local houseData = DB.one('SELECT * FROM bcchousing WHERE houseid = ?', houseId)
+    if not houseData or houseData.ownershipStatus ~= 'purchased'
+        or not HousingProperty.Holds(HousingProperty.KeyForRow(houseData), seller.characterId, 'owner') then
+        return nil, 'houseNotOwnedOrExist'
+    end
+    local houseConfig = findHouseConfigByUniqueName(houseData.uniqueName)
+    if houseConfig and (not houseConfig.canSell or tonumber(houseConfig.currencyType) == 2) then
+        return nil, 'houseCannotBeSold'
+    end
+    return houseConfig
 end
 
 local function makeOffer(src, houseIdParam, targetPlayerIdParam, salePriceParam, withInventory, cb)
@@ -284,16 +318,9 @@ local function makeOffer(src, houseIdParam, targetPlayerIdParam, salePriceParam,
         if cbFn then cbFn(false) end
         return
     end
-    local houseData = DB.one('SELECT * FROM bcchousing WHERE houseid = ?', houseId)
-    if not houseData or houseData.ownershipStatus ~= 'purchased'
-        or not HousingProperty.Holds(HousingProperty.KeyForRow(houseData), seller.characterId, 'owner') then
-        NotifyClient(src, _U('houseNotOwnedOrExist'), 4000, 'error')
-        if cbFn then cbFn(false) end
-        return
-    end
-    local houseConfig = findHouseConfigByUniqueName(houseData.uniqueName)
-    if houseConfig and (not houseConfig.canSell or tonumber(houseConfig.currencyType) == 2) then
-        NotifyClient(src, _U('houseCannotBeSold'), 4000, 'error')
+    local houseConfig, problem = sellableBy(seller, houseId)
+    if problem then
+        NotifyClient(src, _U(problem), 4000, 'error')
         if cbFn then cbFn(false) end
         return
     end
@@ -304,7 +331,7 @@ local function makeOffer(src, houseIdParam, targetPlayerIdParam, salePriceParam,
         sellerSource = src, sellerId = seller.characterId, buyerSource = targetPlayerId,
         buyerId = buyer.characterId, expiresAt = os.time() + OFFER_TTL
     }
-    HousingRPC:Notify('bcc-housing:SaleOffer', {
+    NotifyPlayer('bcc-housing:SaleOffer', {
         offerId = offerId,
         house = houseName(houseConfig, houseId),
         seller = seller.firstname .. ' ' .. seller.lastname,
@@ -318,8 +345,7 @@ local function makeOffer(src, houseIdParam, targetPlayerIdParam, salePriceParam,
 end
 
 local function completeSale(offer)
-    local seller = { characterId = offer.sellerId }
-    local buyer = GetHousingCharacter(offer.buyerSource)
+    local buyer = offer.buyerCharacter or GetHousingCharacter(offer.buyerSource)
     local houseData = DB.one('SELECT * FROM bcchousing WHERE houseid = ?', offer.houseId)
     if not buyer or buyer.characterId ~= offer.buyerId or not houseData then
         return false, 'houseNotOwnedOrExist'
@@ -373,6 +399,17 @@ local function completeSale(offer)
     return true
 end
 
+-- A sale the buyer has already agreed to: the offer and its acceptance happen on
+-- the players' screens, the rest is completeSale. Returns ok and a message key.
+function HousingFlows.SellToPlayer(seller, buyer, houseId, price, withInventory)
+    local _, problem = sellableBy(seller, tonumber(houseId))
+    if problem then return false, problem end
+    return completeSale({
+        id = Housing.NewId(), houseId = tonumber(houseId), price = price, withInventory = withInventory == true,
+        sellerId = seller.characterId, buyerId = buyer.characterId, buyerCharacter = buyer
+    })
+end
+
 HousingRPC:Register('bcc-housing:sellHouseToPlayerWithInventory', function(params, cb, src)
     makeOffer(src, params and params.houseId, params and params.targetPlayerId, params and params.salePrice, true, cb)
 end)
@@ -406,10 +443,10 @@ HousingRPC:Register('bcc-housing:RespondSaleOffer', function(params, cb, src)
 
     local priceText = tostring(offer.price)
     NotifyClient(src, _U(offer.withInventory and 'housePurchasedSuccess' or 'housePurchasedWithoutInventory', priceText), 5000, 'success')
-    HousingRPC:Notify('bcc-housing:ClientRecHouseLoad', {}, src)
+    NotifyPlayer('bcc-housing:ClientRecHouseLoad', {}, src)
     if sellerOnline then
         NotifyClient(offer.sellerSource, _U(offer.withInventory and 'houseSoldSuccess' or 'houseSoldWithoutInventory', priceText), 5000, 'success')
-        HousingRPC:Notify('bcc-housing:ClientRecHouseLoad', {}, offer.sellerSource)
+        NotifyPlayer('bcc-housing:ClientRecHouseLoad', {}, offer.sellerSource)
     end
     cb(true)
 end)
