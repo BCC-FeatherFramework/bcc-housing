@@ -10,7 +10,8 @@
 --   Issue    system source    -> wallet        (sale back to the agent, furniture sell-back)
 --
 -- Issue creates currency, so it is policy-gated in Economy: bcc-housing must be in
--- trustedSuppliers and have the economy.currency.issue service grant. It is called
+-- Config.IssueReasons with those two reasons and have the economy.currency.issue
+-- service grant. It is called
 -- without an actor source, as the bcc-housing service principal.
 
 HousingEconomy = {}

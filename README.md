@@ -72,7 +72,7 @@ Keep the entries already in each list and add `['bcc-housing'] = true`:
 | Resource | Lists |
 |---|---|
 | feather-property `config.lua` | `trustedReaders`, `trustedManagers`, `trustedAuditors` |
-| feather-economy `config.lua` | `trustedReaders`, `trustedProvisioners`, `trustedTransactors`, `trustedSuppliers` |
+| feather-economy `config.lua` | `trustedReaders`, `trustedProvisioners`, `trustedTransactors`; and in `Config.IssueReasons`: `['bcc-housing'] = { ['housing.sold_to_agent'] = true, ['housing.furniture_sold'] = true }` |
 | feather-contracts `config.lua` | `Config.Access.trustedIssuers` |
 | feather-authority `config.lua` | `trustedReaders`, `trustedCapabilityRegistrars`, `trustedRoleCreators`, `trustedGrantors`, `trustedAssigners` |
 | feather-jobs `config.lua` | `trustedReaders` |

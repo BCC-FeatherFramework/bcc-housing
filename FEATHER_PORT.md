@@ -51,7 +51,7 @@ domains that own them; bcc-housing keeps no money and no ownership truth.
 | feather-authority `config.lua` | `trustedReaders`, `trustedCapabilityRegistrars`, `trustedRoleCreators`, `trustedGrantors`, `trustedAssigners` | H2 (added on the dev server) |
 | feather-jobs `config.lua` | `trustedReaders` | H2 (added on the dev server) |
 | feather-property `config.lua`; feather-admin `configs/service_policy.lua` | `trustedReaders`, `trustedManagers`, `trustedAuditors`; `['feather-property']['bcc-housing']` `property.property.manage`, `property.interest.manage` | H3 (added on the dev server) |
-| feather-economy `config.lua`; feather-admin `configs/service_policy.lua` | `trustedReaders`, `trustedProvisioners`, `trustedTransactors`, `trustedSuppliers`; `['feather-economy']['bcc-housing']['economy.currency.issue']` (agent buy-back, furniture sell-back) | H4 (added on the dev server) |
+| feather-economy `config.lua`; feather-admin `configs/service_policy.lua` | `trustedReaders`, `trustedProvisioners`, `trustedTransactors`; `Config.IssueReasons` `housing.sold_to_agent`, `housing.furniture_sold` (not a trusted supplier since 2026-10-16); `['feather-economy']['bcc-housing']['economy.currency.issue']` (agent buy-back, furniture sell-back) | H4 (added on the dev server) |
 | feather-contracts `config.lua`; feather-admin `configs/service_policy.lua` | `trustedIssuers`; `['feather-contracts']['bcc-housing']` `contracts.obligation.issue`, `.cancel`, `.default` | H8 (added on the dev server) |
 - **Holder cache:** `bcchousing.character_id` and `bcchousinghotels` only cache the
   holder; feather-property is the truth. On start every configured house and hotel is
