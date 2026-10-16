@@ -93,7 +93,8 @@ menus, blips and door prompts still need a player. Passed 15/15 on 2026-10-13 (h
    `HousingArrearsFlowTest 1 2026-12-12 <emma>` passed 10/10 on 2026-10-13; `ContractsReconcile`
    stayed HEALTHY.
    `HousingRentFlowTest <characterUuid>` rents a free house, collects next month's rent as a
-   `housing_rent` obligation and ends the rental (DevMode, nobody online).
+   `housing_rent` obligation and ends the rental (DevMode, nobody online); passed 4/4 on
+   2026-10-17 (house16, 2.50 dollars rent).
    Each charge must show in Contracts as a settled `housing_property_tax` (or `housing_rent`)
    obligation; an overdue house keeps one open obligation, which the arrears payment settles.
    `ContractsReconcile` stays HEALTHY with the settlements verified against Economy.
