@@ -149,3 +149,57 @@ RegisterCommand('HousingPropertyFlowTest', function(source, args)
     print(('[HousingPropertyFlowTest] done %d/%d passed (MUTATING: house %s, run %s)'):format(passed, total,
         house.uniqueName, runId))
 end, true)
+
+-- Console, DevMode only: monthly rent through feather-contracts with nobody
+-- online. MOVES MONEY: the character rents the cheapest free house (deposit),
+-- the rent of the next month is collected as a housing_rent obligation, and the
+-- rental is ended again. The character must hold no house and afford the
+-- deposit and one month of rent.
+--   HousingRentFlowTest <characterUuid>
+RegisterCommand('HousingRentFlowTest', function(source, args)
+    if source ~= 0 then return end
+    local characterId = Uuid(args[1])
+    if not characterId then
+        return print('[HousingRentFlowTest] usage: HousingRentFlowTest <characterUuid>')
+    end
+    if DB.one('SELECT houseid FROM bcchousing WHERE character_id = ?', characterId) then
+        return print('[HousingRentFlowTest] ' .. characterId .. ' already holds a house (MaxHousePerChar)')
+    end
+    local house = FreeHouse()
+    if not house then return print('[HousingRentFlowTest] no free house that can be rented') end
+    local tenant = { characterId = characterId }
+    local passed, total = 0, 0
+    local function Check(name, condition)
+        total = total + 1
+        if condition then passed = passed + 1 end
+        print(('[HousingRentFlowTest] %-32s %s'):format(name, condition and 'PASS' or 'FAIL'))
+    end
+    local function Row() return DB.one('SELECT * FROM bcchousing WHERE uniqueName = ?', house.uniqueName) end
+    print(('[HousingRentFlowTest] house %s: deposit %s, rent %s per month'):format(house.uniqueName,
+        tostring(house.rentalDeposit), tostring(house.rentCharge)))
+
+    local called, problem = xpcall(function()
+        local rented = HousingFlows.Purchase(tenant, house.houseCoords, 1)
+        local row = Row()
+        Check('rented', rented.ok and row ~= nil and row.ownershipStatus == 'rented')
+        if not rented.ok or not row then return end
+
+        -- The next due date: the same day next month (the last day of a shorter month).
+        local now = os.date('*t')
+        local year, month = now.year + (now.month == 12 and 1 or 0), now.month % 12 + 1
+        local last = os.date('*t', os.time({ year = year + (month == 12 and 1 or 0), month = month % 12 + 1, day = 1 }) - 86400).day
+        HousingTaxes.Collect({ year = year, month = month, day = math.min(now.day, last) }, row.houseid)
+        local after = Row()
+        local obligation = after and after.tax_obligation_id and HousingContracts.Get(after.tax_obligation_id)
+        Check('rent collected on the due date', after ~= nil and after.taxes_collected == 'true')
+        Check('collected as a housing_rent obligation', obligation and obligation.ok
+            and obligation.value.obligationType == 'housing_rent' and obligation.value.status == 'settled'
+            and obligation.value.debtor.id == characterId
+            and obligation.value.amount == HousingEconomy.ToMinor(house.rentCharge))
+
+        local ended = HousingFlows.Unrent(tenant, row.houseid)
+        Check('rental ended (cleanup)', ended.ok and Row() == nil)
+    end, debug.traceback)
+    if not called then print('[HousingRentFlowTest] FAIL ' .. tostring(problem)) end
+    print(('[HousingRentFlowTest] done %d/%d passed (MUTATING: house %s)'):format(passed, total, house.uniqueName))
+end, true)

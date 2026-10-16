@@ -92,6 +92,8 @@ menus, blips and door prompts still need a player. Passed 15/15 on 2026-10-13 (h
    arrears are collected by bcc-housing; paying them in game runs with the player as debtor.
    `HousingArrearsFlowTest 1 2026-12-12 <emma>` passed 10/10 on 2026-10-13; `ContractsReconcile`
    stayed HEALTHY.
+   `HousingRentFlowTest <characterUuid>` rents a free house, collects next month's rent as a
+   `housing_rent` obligation and ends the rental (DevMode, nobody online).
    Each charge must show in Contracts as a settled `housing_property_tax` (or `housing_rent`)
    obligation; an overdue house keeps one open obligation, which the arrears payment settles.
    `ContractsReconcile` stays HEALTHY with the settlements verified against Economy.
